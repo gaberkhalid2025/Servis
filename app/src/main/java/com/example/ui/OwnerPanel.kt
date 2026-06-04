@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -367,7 +368,7 @@ fun OwnerPanel(
                                 modifier = Modifier.weight(1f),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
                             ) {
-                                Column(modifier = Modifier.padding(12.dp), Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "إجمالي المهنيين", fontSize = 11.sp, color = Color.LightGray)
                                     Text(text = providers.size.toString(), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
@@ -376,7 +377,7 @@ fun OwnerPanel(
                                 modifier = Modifier.weight(1f),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
                             ) {
-                                Column(modifier = Modifier.padding(12.dp), Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "طلبات قيد المراجعة", fontSize = 11.sp, color = Color.LightGray)
                                     Text(text = pendingProviders.size.toString(), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Cyan)
                                 }
@@ -385,7 +386,7 @@ fun OwnerPanel(
                                 modifier = Modifier.weight(1f),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
                             ) {
-                                Column(modifier = Modifier.padding(12.dp), Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "المراجعات والردود", fontSize = 11.sp, color = Color.LightGray)
                                     Text(text = reviews.size.toString(), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Yellow)
                                 }
@@ -1046,7 +1047,7 @@ fun OwnerPanel(
             containerColor = Color(0xFF1E293B),
             title = { Text("إضافة مقدم خدمة ومحترف مباشرة 🛠️", color = MaterialTheme.colorScheme.primary, fontSize = 18.sp) },
             text = {
-                Column(verticalScroll = rememberScrollState(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = dpName, onValueChange = { dpName = it }, label = { Text("الاسم الكامل للمهني") }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White))
                     OutlinedTextField(value = dpPhone, onValueChange = { dpPhone = it }, label = { Text("رقم الهاتف") }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White))
                     OutlinedTextField(value = dpRegion, onValueChange = { dpRegion = it }, label = { Text("المديرية أو المنطقة السكنية") }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White))

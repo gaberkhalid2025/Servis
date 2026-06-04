@@ -8,16 +8,13 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example"
+        applicationId = "com.aistudio.yemenservices.wam"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
     }
 
     buildTypes {
@@ -55,21 +52,18 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     
-    // Compose
-    val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
-    implementation(composeBom)
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    // Compose with solid explicit versions
+    implementation("androidx.compose.ui:ui:1.6.1")
+    implementation("androidx.compose.ui:ui-graphics:1.6.1")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.6.1")
+    implementation("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
-    // Firebase
-    val firebaseBom = platform("com.google.firebase:firebase-bom:32.7.2")
-    implementation(firebaseBom)
-    implementation("com.google.firebase:firebase-firestore-ktx")
+    // Firebase Firestore with solid explicit version
+    implementation("com.google.firebase:firebase-firestore-ktx:24.10.2")
+    implementation("com.google.firebase:firebase-common-ktx:20.4.2")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

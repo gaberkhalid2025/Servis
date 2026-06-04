@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -501,7 +502,7 @@ fun MainScreen() {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(130.dp)
-                                        .padding(horizontal = 12.dp, bottom = 12.dp),
+                                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
                                     border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f))
                                 ) {

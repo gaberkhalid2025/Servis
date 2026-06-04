@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -60,6 +62,20 @@ object FirestoreSim {
     private val _userPoints = MutableStateFlow(125)
     val userPoints: StateFlow<Int> = _userPoints
 
+    // Dynamic Cities State for admin addition / removal
+    private val _cities = MutableStateFlow<List<String>>(listOf("صنعاء", "عدن", "تعز", "الحديدة", "حضرموت"))
+    val cities: StateFlow<List<String>> = _cities
+
+    fun addCity(city: String) {
+        if (city.isNotBlank() && !_cities.value.contains(city)) {
+            _cities.value = _cities.value + city
+        }
+    }
+
+    fun removeCity(city: String) {
+        _cities.value = _cities.value.filter { it != city }
+    }
+
     // Current Session Identity
     var currentUserId = "guest"
     var currentUserName = "زائر كريم"
@@ -73,6 +89,15 @@ object FirestoreSim {
     fun initialize(context: Context) {
         // 1. Setup Firebase with Offline Persistence if initialized
         try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                val options = FirebaseOptions.Builder()
+                    .setApplicationId("1:736462777644:android:2b2b2b2b2b2b2b2b2b2b")
+                    .setApiKey("AIzaSyFakeKey_YemenServicesSecureKey")
+                    .setProjectId("yemen-services-app")
+                    .setStorageBucket("yemen-services-app.appspot.com")
+                    .build()
+                FirebaseApp.initializeApp(context, options)
+            }
             firestore = FirebaseFirestore.getInstance()
             val settings = FirebaseFirestoreSettings.Builder()
                 .setPersistenceEnabled(true)
