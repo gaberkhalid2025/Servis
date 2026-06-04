@@ -62,6 +62,15 @@ object FirestoreSim {
     private val _userLoyaltyPoints = MutableStateFlow(0)
     val userLoyaltyPoints: StateFlow<Int> = _userLoyaltyPoints.asStateFlow()
 
+    private val _moderators = MutableStateFlow<List<Moderator>>(emptyList())
+    val moderators: StateFlow<List<Moderator>> = _moderators.asStateFlow()
+
+    private val _favorites = MutableStateFlow<Set<String>>(emptySet())
+    val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
+
+    private val _contactHistory = MutableStateFlow<List<ContactLog>>(emptyList())
+    val contactHistory: StateFlow<List<ContactLog>> = _contactHistory.asStateFlow()
+
     // Sync state visual notifications
     private val _syncStatus = MutableStateFlow("متزامن بالكامل مع السحابة المركزية")
     val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
@@ -165,6 +174,21 @@ object FirestoreSim {
 
         _appColors.value = AppColors("Cosmic Slate", "Bright White")
         _appConfigs.value = AppConfigs()
+
+        // 11. Initial Moderators Seeding
+        _moderators.value = listOf(
+            Moderator("mod_1", "صالح المشرف الأول", "salih2026", "pass123"),
+            Moderator("mod_2", "سارة مشرفة السبعين", "sara2026", "sara777")
+        )
+
+        // 12. Initial Favorites Seeding
+        _favorites.value = setOf("p_1", "p_3")
+
+        // 13. Initial Contact History Seeding
+        _contactHistory.value = listOf(
+            ContactLog("cl_1", "p_1", System.currentTimeMillis() - 3600000 * 2, "Call"),
+            ContactLog("cl_2", "p_3", System.currentTimeMillis() - 3600000 * 24, "WhatsApp")
+        )
     }
 
     // Snapshot Listening implementation
@@ -205,6 +229,7 @@ object FirestoreSim {
             editor.putBoolean("maintenance_active", _appConfigs.value.isMaintenanceActive)
             editor.putFloat("assistant_size", _appConfigs.value.smartAssistantSize)
             editor.putBoolean("show_footer", _appConfigs.value.showPromoFooter)
+            editor.putFloat("category_icon_size", _appConfigs.value.categoryIconSize)
 
             // Save Colors
             editor.putString("theme_name", _appColors.value.themeName)
@@ -212,6 +237,12 @@ object FirestoreSim {
 
             // Points
             editor.putInt("loyalty_points", _userLoyaltyPoints.value)
+
+            // Save User Dashboard customizations
+            editor.putBoolean("show_dashboard_favs", _appConfigs.value.showDashboardFavorites)
+            editor.putBoolean("show_dashboard_history", _appConfigs.value.showDashboardCallHistory)
+            editor.putBoolean("dashboard_favs_first", _appConfigs.value.dashboardFavoritesFirst)
+            editor.putString("dashboard_custom_msg", _appConfigs.value.dashboardCustomMessage)
 
             // Dynamic serialization for lists (simple CSV-like serialization to ensure zero dependency bugs)
             editor.putString("main_categories_serial", serializeMainCategories(_mainCategories.value))
@@ -224,6 +255,9 @@ object FirestoreSim {
             editor.putString("banners_serial", serializeBanners(_banners.value))
             editor.putString("promoted_ads_serial", serializePromotedAds(_promotedAds.value))
             editor.putString("fcm_channels_serial", serializeFcmChannels(_fcmChannels.value))
+            editor.putString("favorites_serial", serializeFavorites(_favorites.value))
+            editor.putString("contact_history_serial", serializeContactHistory(_contactHistory.value))
+            editor.putString("moderators_serial", serializeModerators(_moderators.value))
 
             editor.apply()
         } catch (e: Exception) {
@@ -245,7 +279,12 @@ object FirestoreSim {
                 adminPassword = prefs.getString("admin_password", "maher736462") ?: "maher736462",
                 isMaintenanceActive = prefs.getBoolean("maintenance_active", false),
                 smartAssistantSize = prefs.getFloat("assistant_size", 56f),
-                showPromoFooter = prefs.getBoolean("show_footer", true)
+                showPromoFooter = prefs.getBoolean("show_footer", true),
+                showDashboardFavorites = prefs.getBoolean("show_dashboard_favs", true),
+                showDashboardCallHistory = prefs.getBoolean("show_dashboard_history", true),
+                dashboardFavoritesFirst = prefs.getBoolean("dashboard_favs_first", true),
+                dashboardCustomMessage = prefs.getString("dashboard_custom_msg", "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!") ?: "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!",
+                categoryIconSize = prefs.getFloat("category_icon_size", 32f)
             )
 
             _appColors.value = AppColors(
@@ -286,6 +325,15 @@ object FirestoreSim {
             prefs.getString("fcm_channels_serial", null)?.let {
                 _fcmChannels.value = deserializeFcmChannels(it)
             }
+            prefs.getString("favorites_serial", null)?.let {
+                _favorites.value = deserializeFavorites(it)
+            }
+            prefs.getString("contact_history_serial", null)?.let {
+                _contactHistory.value = deserializeContactHistory(it)
+            }
+            prefs.getString("moderators_serial", null)?.let {
+                _moderators.value = deserializeModerators(it)
+            }
         } catch (e: Exception) {
             Log.e("FirestoreSim", "Error loading data from SharedPreferences", e)
             seedInitialData()
@@ -306,6 +354,51 @@ object FirestoreSim {
         _appConfigs.value = configs
         saveToDisk(context)
         triggerUpdate("admins")
+    }
+
+    fun toggleFavorite(context: Context, providerId: String) {
+        val current = _favorites.value.toMutableSet()
+        if (current.contains(providerId)) {
+            current.remove(providerId)
+        } else {
+            current.add(providerId)
+        }
+        _favorites.value = current
+        saveToDisk(context)
+        triggerUpdate("favorites")
+    }
+
+    fun addContactLog(context: Context, providerId: String, mode: String) {
+        val current = _contactHistory.value.toMutableList()
+        current.add(0, ContactLog("cl_${System.currentTimeMillis()}", providerId, System.currentTimeMillis(), mode))
+        _contactHistory.value = current.take(50)
+        saveToDisk(context)
+        triggerUpdate("contact_history")
+    }
+
+    fun clearContactHistory(context: Context) {
+        _contactHistory.value = emptyList()
+        saveToDisk(context)
+        triggerUpdate("contact_history")
+    }
+
+    fun saveModerator(context: Context, mod: Moderator) {
+        val current = _moderators.value.toMutableList()
+        val index = current.indexOfFirst { it.id == mod.id }
+        if (index >= 0) {
+            current[index] = mod
+        } else {
+            current.add(mod.copy(id = "mod_${System.currentTimeMillis()}"))
+        }
+        _moderators.value = current
+        saveToDisk(context)
+        triggerUpdate("moderators")
+    }
+
+    fun deleteModerator(context: Context, modId: String) {
+        _moderators.value = _moderators.value.filter { it.id != modId }
+        saveToDisk(context)
+        triggerUpdate("moderators")
     }
 
     fun addLoyaltyPoints(context: Context, amt: Int) {
@@ -827,6 +920,38 @@ object FirestoreSim {
         return s.split(";").mapNotNull {
             val p = it.split(",")
             if (p.size >= 3) FcmChannelState(p[0], p[1], p[2].toBoolean()) else null
+        }
+    }
+
+    private val _fcmChannelsStateSerialList = mutableListOf<String>() // dummy holder
+
+    private fun serializeModerators(list: List<Moderator>): String {
+        return list.joinToString(";") { "${it.id},${it.name},${it.username},${it.password}" }
+    }
+    private fun deserializeModerators(s: String): List<Moderator> {
+        if (s.isBlank()) return emptyList()
+        return s.split(";").mapNotNull {
+            val p = it.split(",")
+            if (p.size >= 4) Moderator(p[0], p[1], p[2], p[3]) else null
+        }
+    }
+
+    private fun serializeFavorites(set: Set<String>): String {
+        return set.joinToString(",")
+    }
+    private fun deserializeFavorites(s: String): Set<String> {
+        if (s.isBlank()) return emptySet()
+        return s.split(",").filter { it.isNotBlank() }.toSet()
+    }
+
+    private fun serializeContactHistory(list: List<ContactLog>): String {
+        return list.joinToString(";") { "${it.id},${it.providerId},${it.timestamp},${it.mode}" }
+    }
+    private fun deserializeContactHistory(s: String): List<ContactLog> {
+        if (s.isBlank()) return emptyList()
+        return s.split(";").mapNotNull {
+            val p = it.split(",")
+            if (p.size >= 4) ContactLog(p[0], p[1], p[2].toLongOrNull() ?: System.currentTimeMillis(), p[3]) else null
         }
     }
 }

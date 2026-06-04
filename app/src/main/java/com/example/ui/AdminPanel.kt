@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -42,12 +43,14 @@ fun AdminPanel(
 
     // Current panel tab selection
     var activeTab by remember { mutableStateOf(0) }
-    val tabs = listOf("طلبات التسجيل", "إدارة الأقسام", "إضافة فني يدوياً")
+    val tabs = listOf("طلبات التسجيل", "إدارة الأقسام", "إضافة فني يدوياً", "تخصيص اللوحة", "إدارة المشرفين", "ترتيب وحجم الأقسام")
 
     // Database states
     val pendingRequests = FirestoreSim.pendingProviders.collectAsState()
     val mainCats = FirestoreSim.mainCategories.collectAsState()
     val subCats = FirestoreSim.subCategories.collectAsState()
+    val moderators = FirestoreSim.moderators.collectAsState()
+    val configs = FirestoreSim.appConfigs.collectAsState()
 
     // Dialog details/zooming states
     var selectedRequestForDetails by remember { mutableStateOf<PendingProvider?>(null) }
@@ -122,10 +125,11 @@ fun AdminPanel(
         }
 
         // Horizontal navigation tabs
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = activeTab,
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
+            contentColor = MaterialTheme.colorScheme.primary,
+            edgePadding = 8.dp
         ) {
             tabs.forEachIndexed { idx, title ->
                 Tab(
@@ -266,6 +270,36 @@ fun AdminPanel(
                 2 -> {
                     // TAB 3: Instant hand provider enrollment ("إضافة فني يدوياً")
                     DirectAddProviderView(mainCats.value, subCats.value, writeTextColor)
+                }
+
+                3 -> {
+                    // TAB 4: User Dashboard Customization ("تخصيص اللوحة")
+                    UserDashboardSettingsTab(
+                        configs = configs.value,
+                        onSave = { updated -> FirestoreSim.updateConfigs(context, updated) },
+                        writeTextColor = writeTextColor
+                    )
+                }
+
+                4 -> {
+                    // TAB 5: Moderator Management ("إدارة المشرفين")
+                    ModeratorsManagementTab(
+                        moderators = moderators.value,
+                        onSaveMod = { mod -> FirestoreSim.saveModerator(context, mod) },
+                        onDeleteMod = { modId -> FirestoreSim.deleteModerator(context, modId) },
+                        writeTextColor = writeTextColor
+                    )
+                }
+
+                5 -> {
+                    // TAB 6: Category Icons, Sizing and Reordering ("ترتيب وحجم الأقسام")
+                    CategoryIconsSizingReorderingTab(
+                        mainCategories = mainCats.value,
+                        configs = configs.value,
+                        onSaveCategory = { cat -> FirestoreSim.saveMainCategory(context, cat) },
+                        onUpdateConfigs = { updated -> FirestoreSim.updateConfigs(context, updated) },
+                        writeTextColor = writeTextColor
+                    )
                 }
             }
         }
@@ -988,3 +1022,486 @@ fun EmptyStateView(
 }
 
 private val SoftGray = Color(0xFF8E8E93)
+
+@Composable
+fun UserDashboardSettingsTab(
+    configs: AppConfigs,
+    onSave: (AppConfigs) -> Unit,
+    writeTextColor: Color
+) {
+    var customMsg by remember { mutableStateOf(configs.dashboardCustomMessage) }
+    var showFavs by remember { mutableStateOf(configs.showDashboardFavorites) }
+    var showCallHistory by remember { mutableStateOf(configs.showDashboardCallHistory) }
+    var favsFirst by remember { mutableStateOf(configs.dashboardFavoritesFirst) }
+
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text("تخصيص لوحة تحكم المستخدمين العامة", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+        }
+
+        Text(
+            "تُمكّن هذه الإعدادات المشرفين من التحكم في شكل ومحتوى لوحة تحكم المفضلات وسجلات التواصل الخاصة بالمستخدم.",
+            fontSize = 11.sp,
+            color = Color.LightGray,
+            lineHeight = 16.sp
+        )
+
+        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+        OutlinedTextField(
+            value = customMsg,
+            onValueChange = { customMsg = it },
+            label = { Text("رسالة ترحيب مخصصة باللوحة") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("عرض قسم المفضلة", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("إظهار الفنيين المفضلين الذين حفظهم المستخدم", color = Color.Gray, fontSize = 10.sp)
+            }
+            Switch(
+                checked = showFavs,
+                onCheckedChange = { showFavs = it },
+                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("عرض قسم سجل التواصل", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("إظهار قائمة الفنيين الذين اتصل بهم المستخدم مؤخراً", color = Color.Gray, fontSize = 10.sp)
+            }
+            Switch(
+                checked = showCallHistory,
+                onCheckedChange = { showCallHistory = it },
+                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("تقديم قسم المفضلة أولاً", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("إذا تم التعطيل سيظهر سجل التواصل في الأعلى أولاً", color = Color.Gray, fontSize = 10.sp)
+            }
+            Switch(
+                checked = favsFirst,
+                onCheckedChange = { favsFirst = it },
+                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Button(
+            onClick = {
+                val updated = configs.copy(
+                    dashboardCustomMessage = customMsg,
+                    showDashboardFavorites = showFavs,
+                    showDashboardCallHistory = showCallHistory,
+                    dashboardFavoritesFirst = favsFirst
+                )
+                onSave(updated)
+                Toast.makeText(context, "تم حفظ الإعدادات المخصصة وتطبيقها فوراً بنجاح!", Toast.LENGTH_SHORT).show()
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("حفظ التكوين والتخصيص", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun ModeratorsManagementTab(
+    moderators: List<Moderator>,
+    onSaveMod: (Moderator) -> Unit,
+    onDeleteMod: (String) -> Unit,
+    writeTextColor: Color
+) {
+    var nameInput by remember { mutableStateOf("") }
+    var userInput by remember { mutableStateOf("") }
+    var passInput by remember { mutableStateOf("") }
+    var editingModId by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text("إدارة المشرفين الفرعيين (Sub-Admins)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+        }
+
+        Text(
+            "تمنح هذه الشاشة الصلاحية التامة لمشرفي النظام الرئيسيين ولملاك التطبيق لإضافة مشرفين جدد، أو تعديل حساباتهم، أو شطبهم نهائياً.",
+            fontSize = 11.sp,
+            color = Color.LightGray,
+            lineHeight = 16.sp
+        )
+
+        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+        // Form Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (editingModId == null) "إضافة مشرف جديد للنظام" else "تعديل بيانات المشرف الحالي",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 13.sp
+                )
+
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    label = { Text("الاسم الكامل للمشرف") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                    singleLine = true
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = userInput,
+                        onValueChange = { userInput = it },
+                        label = { Text("اسم المستخدم") },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = passInput,
+                        onValueChange = { passInput = it },
+                        label = { Text("كلمة المرور") },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                        singleLine = true
+                    )
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            if (nameInput.isBlank() || userInput.isBlank() || passInput.isBlank()) {
+                                Toast.makeText(context, "الرجاء كشط جميع الحقول لحفظ بيانات الحساب!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onSaveMod(Moderator(editingModId ?: "", nameInput, userInput, passInput))
+                                Toast.makeText(context, "تم حفظ حساب المشرف وتجهيزه للولوج الفوري!", Toast.LENGTH_SHORT).show()
+                                nameInput = ""
+                                userInput = ""
+                                passInput = ""
+                                editingModId = null
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(if (editingModId == null) "حفظ المشرف" else "حفظ التعديلات")
+                    }
+
+                    if (editingModId != null) {
+                        Button(
+                            onClick = {
+                                nameInput = ""
+                                userInput = ""
+                                passInput = ""
+                                editingModId = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("إلغاء")
+                        }
+                    }
+                }
+            }
+        }
+
+        // List
+        Text("قائمة المشرفين المعتمدين والمفعلين", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(moderators) { m ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(m.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                        Text("اسم الدخول: ${m.username} | السر: ${m.password}", color = Color.Gray, fontSize = 11.sp)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = {
+                                editingModId = m.id
+                                nameInput = m.name
+                                userInput = m.username
+                                passInput = m.password
+                            },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        }
+
+                        IconButton(
+                            onClick = {
+                                onDeleteMod(m.id)
+                                Toast.makeText(context, "تم حذف حساب المشرف وإسقاط صلاحياته نهائياً!", Toast.LENGTH_SHORT).show()
+                                if (editingModId == m.id) {
+                                    nameInput = ""
+                                    userInput = ""
+                                    passInput = ""
+                                    editingModId = null
+                                }
+                            },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AlertRed, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryIconsSizingReorderingTab(
+    mainCategories: List<MainCategory>,
+    configs: AppConfigs,
+    onSaveCategory: (MainCategory) -> Unit,
+    onUpdateConfigs: (AppConfigs) -> Unit,
+    writeTextColor: Color
+) {
+    var iconSize by remember { mutableStateOf(configs.categoryIconSize) }
+    var selectedCatForIconEdit by remember { mutableStateOf<MainCategory?>(null) }
+    var customIconCodeInput by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text("تعديل حجم وترتيب الأيقونات وحركيتها", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+        }
+
+        // Section 1: Icon Sizing
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("تخصيص حجم أيقونات الأقسام (Sizing)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("الحجم: ${iconSize.toInt()} dp", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Slider(
+                        value = iconSize,
+                        onValueChange = { iconSize = it },
+                        valueRange = 20f..72f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(activeTrackColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        onUpdateConfigs(configs.copy(categoryIconSize = iconSize))
+                        Toast.makeText(context, "تم حفظ الحجم الجديد للأيقونات وتعميمه للعرض!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("حفظ وتعميم حجم الأيقونة", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
+        }
+
+        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+        // Section 2: Order & Icons listing
+        Text("حركية الأقسام (الترتيب والرموز الخلوية)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+
+        if (selectedCatForIconEdit != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("تعديل رمز الأيقونة لقسم: ${selectedCatForIconEdit!!.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                    Text("الرموز المتاحة: (home, medical, school, car, star, settings, lock, work, design_services, build)", color = Color.Gray, fontSize = 10.sp)
+
+                    OutlinedTextField(
+                        value = customIconCodeInput,
+                        onValueChange = { customIconCodeInput = it },
+                        label = { Text("اسم رمز الأيقونة الجديد (iconCode)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                        singleLine = true
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                onSaveCategory(selectedCatForIconEdit!!.copy(iconCode = customIconCodeInput))
+                                Toast.makeText(context, "تم تبديل أيقونة القسم بنجاح!", Toast.LENGTH_SHORT).show()
+                                selectedCatForIconEdit = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("تطبيق الأيقونة")
+                        }
+                        Button(
+                            onClick = { selectedCatForIconEdit = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("رجوع")
+                        }
+                    }
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(mainCategories.sortedBy { it.order }) { cat ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = getIconForCode(cat.iconCode),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(cat.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                            Text("رمزها: ${cat.iconCode} | ترتيب العرض: ${cat.order}", color = Color.Gray, fontSize = 10.sp)
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Change Icon Trigger
+                        Button(
+                            onClick = {
+                                selectedCatForIconEdit = cat
+                                customIconCodeInput = cat.iconCode
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), contentColor = MaterialTheme.colorScheme.primary),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("الأيقونة", fontSize = 10.sp)
+                        }
+
+                        // Order Up / Down Button
+                        IconButton(
+                            onClick = {
+                                onSaveCategory(cat.copy(order = cat.order - 1))
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = "أعلى", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                        }
+
+                        IconButton(
+                            onClick = {
+                                onSaveCategory(cat.copy(order = cat.order + 1))
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowDownward, contentDescription = "أسفل", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun getIconForCode(code: String): androidx.compose.ui.graphics.vector.ImageVector {
+    return when(code) {
+        "medical" -> Icons.Default.MedicalServices
+        "school" -> Icons.Default.School
+        "car" -> Icons.Default.DirectionsCar
+        "home" -> Icons.Default.Home
+        "star" -> Icons.Default.Star
+        "settings" -> Icons.Default.Settings
+        "lock" -> Icons.Default.Lock
+        "work" -> Icons.Default.Work
+        "build" -> Icons.Default.Build
+        "design_services" -> Icons.Default.DesignServices
+        else -> Icons.Default.HomeWork
+    }
+}
+

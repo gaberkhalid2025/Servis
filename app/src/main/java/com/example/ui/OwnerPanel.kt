@@ -37,7 +37,7 @@ fun OwnerPanel(
     val appConfigs = FirestoreSim.appConfigs.collectAsState()
 
     // Panel tabs
-    val tabs = listOf("الهوية والقرارات", "التثبيت والتوصية", "التقارير", "النسخ والإشعارات", "المساعد والدعم")
+    val tabs = listOf("الهوية والقرارات", "التثبيت والتوصية", "التقارير", "النسخ والإشعارات", "المساعد والدعم", "إدارة المشرفين")
     var selectedTab by remember { mutableStateOf(0) }
 
     // Backup & DB stats
@@ -699,9 +699,19 @@ fun OwnerPanel(
                         }
                     }
                 }
+
+                5 -> {
+                    val moderators = FirestoreSim.moderators.collectAsState().value
+                    ModeratorsManagementTab(
+                        moderators = moderators,
+                        onSaveMod = { mod -> FirestoreSim.saveModerator(context, mod) },
+                        onDeleteMod = { modId -> FirestoreSim.deleteModerator(context, modId) },
+                        writeTextColor = writeTextColor
+                    )
+                }
+                }
             }
         }
-    }
 
     // Modal dialogue: Showing backups status / Google Drive sync logs
     showBackupLogDialog?.let { logText ->

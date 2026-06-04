@@ -37,6 +37,7 @@ fun AuthScreen(
     val context = LocalContext.current
     val appColors = FirestoreSim.appColors.collectAsState()
     val configs = FirestoreSim.appConfigs.collectAsState()
+    val moderatorsList = FirestoreSim.moderators.collectAsState().value
     val writeTextColor = getSelectedTextColor(appColors.value.textColorName)
 
     // Form states
@@ -163,9 +164,12 @@ fun AuthScreen(
                     Button(
                         onClick = {
                             val defaultPass = configs.value.adminPassword
-                            if (username == "WAM2026" && password == defaultPass) {
+                            val isDefaultMod = username == "WAM2026" && password == defaultPass
+                            val customMod = moderatorsList.find { it.username == username && it.password == password }
+                            if (isDefaultMod || customMod != null) {
+                                val greetingName = customMod?.name ?: "مشرف"
                                 onLoginSuccess("moderator")
-                                Toast.makeText(context, "أهلاً بك يا مشرف! تم فتح لوحة تحكم الإدارة بنجاح.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "أهلاً بك يا $greetingName! تم فتح لوحة تحكم الإدارة بنجاح.", Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(context, "الاسم أو كلمة المرور غير صحيحة! تأكد وأعد المحاولة.", Toast.LENGTH_LONG).show()
                             }

@@ -74,7 +74,12 @@ data class AppConfigs(
     val adminPassword: String = "maher736462",
     val isMaintenanceActive: Boolean = false,
     val smartAssistantSize: Float = 56f,
-    val showPromoFooter: Boolean = true
+    val showPromoFooter: Boolean = true,
+    val showDashboardFavorites: Boolean = true,
+    val showDashboardCallHistory: Boolean = true,
+    val dashboardFavoritesFirst: Boolean = true,
+    val dashboardCustomMessage: String = "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!",
+    val categoryIconSize: Float = 32f
 )
 
 @Immutable
@@ -134,3 +139,21 @@ data class FcmChannelState(
     val name: String = "",
     val isEnabled: Boolean = true
 )
+
+@Immutable
+data class Moderator(
+    val id: String = "",
+    val name: String = "",
+    val username: String = "",
+    val password: String = ""
+)
+
+@Immutable
+data class ContactLog(
+    val id: String = "",
+    val providerId: String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val mode: String = "Call" // "Call" or "WhatsApp"
+)
+
+

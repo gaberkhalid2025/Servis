@@ -52,6 +52,11 @@ fun MainScreen(
     val banners = FirestoreSim.banners.collectAsState().value
     val promotedAds = FirestoreSim.promotedAds.collectAsState().value
     val cities = FirestoreSim.cities.collectAsState().value
+    val favorites = FirestoreSim.favorites.collectAsState().value
+    val contactHistory = FirestoreSim.contactHistory.collectAsState().value
+
+    // User Dashboard dialogue state
+    var showDashboardDialog by remember { mutableStateOf(false) }
 
     // Language Toggle State: False = Arabic (Default), True = English
     var isEnglishLanguage by remember { mutableStateOf(false) }
@@ -115,22 +120,7 @@ fun MainScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF00FF00))
-                    )
-                    Text(
-                        text = "متزامن • سحابة 2026 نشطة",
-                        fontSize = 9.sp,
-                        color = Color.Gray
-                    )
-                }
+
             }
 
             // Group 2: The Core 5 Header Navigation Buttons (RTL ordered functionally)
@@ -169,6 +159,20 @@ fun MainScreen(
                         imageVector = Icons.Default.Home,
                         contentDescription = "الرئيسية",
                         tint = if (selectedMainCategoryPath == null) MaterialTheme.colorScheme.primary else Color.White
+                    )
+                }
+
+                // ICON Dashboard: 📱 User Dashboard (Favorites & Contacts)
+                IconButton(
+                    onClick = {
+                        showDashboardDialog = true
+                    },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "المفضلة والمكالمات",
+                        tint = Color(0xFFFFD700)
                     )
                 }
 
@@ -559,7 +563,7 @@ fun MainScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.height(290.dp) // fits perfectly
                         ) {
-                            items(mainCats) { cat ->
+                            items(mainCats.sortedBy { it.order }) { cat ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -574,30 +578,25 @@ fun MainScreen(
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(16.dp).fillMaxSize(),
+                                        modifier = Modifier.padding(12.dp).fillMaxSize(),
                                         verticalArrangement = Arrangement.Center,
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(46.dp)
+                                                .size((appConfigs.value.categoryIconSize + 20f).dp)
                                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = when(cat.iconCode) {
-                                                    "medical" -> Icons.Default.MedicalServices
-                                                    "school" -> Icons.Default.School
-                                                    "car" -> Icons.Default.DirectionsCar
-                                                    else -> Icons.Default.HomeWork
-                                                },
+                                                imageVector = getIconForCode(cat.iconCode),
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(appConfigs.value.categoryIconSize.dp)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Text(cat.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, textAlign = TextAlign.Center)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(cat.name, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White, textAlign = TextAlign.Center)
                                         val subCount = subCats.filter { it.parentId == cat.id }.size
                                         Text("تضم: $subCount مهن فرعية", fontSize = 9.sp, color = Color.Gray)
                                     }
@@ -862,7 +861,7 @@ fun MainScreen(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(56.dp)
                         )
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(p.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
                                 if (p.isSubscribed) {
@@ -870,6 +869,19 @@ fun MainScreen(
                                 }
                             }
                             Text(p.district, fontSize = 12.sp, color = Color.Gray)
+                        }
+                        val isFav = favorites.contains(p.id)
+                        IconButton(
+                            onClick = {
+                                FirestoreSim.toggleFavorite(context, p.id)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "تفضيل",
+                                tint = if (isFav) Color(0xFFFFD700) else Color.Gray.copy(alpha = 0.5f),
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
 
@@ -880,6 +892,7 @@ fun MainScreen(
                     ) {
                         Button(
                             onClick = {
+                                FirestoreSim.addContactLog(context, p.id, "اتصال هاتفي")
                                 Toast.makeText(context, "جاري فتح مباشر تطبيق الاتصال للهاتف: ${p.phone}", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -893,6 +906,7 @@ fun MainScreen(
 
                         Button(
                             onClick = {
+                                FirestoreSim.addContactLog(context, p.id, "واتساب")
                                 Toast.makeText(context, "جاري تحويلك لمحادثة واتساب آمنة مع المهني!", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
@@ -1179,6 +1193,192 @@ fun MainScreen(
     // Opens Smart Assistant chat
     if (isAssistantChatOpen) {
         AssistantDialog(onDismiss = { isAssistantChatOpen = false })
+    }
+
+    // Opens User Dashboard (M3 Dialog)
+    if (showDashboardDialog) {
+        val configs = appConfigs.value
+        Dialog(onDismissRequest = { showDashboardDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1D1B20)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.85f)
+                    .padding(4.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Dashboard, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Text("لوحتك لخدماتك المفضلة وسجلاتك 📱", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                        }
+                        IconButton(onClick = { showDashboardDialog = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
+                        }
+                    }
+
+                    Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+                    // Custom Welcome Message (set/configured by Admin!)
+                    if (configs.dashboardCustomMessage.isNotBlank()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        ) {
+                            Text(
+                                text = configs.dashboardCustomMessage,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(10.dp),
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    // Content Area with Scrolling
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Determine layout order based on admin custom config!
+                        val favsBlock = @Composable {
+                            if (configs.showDashboardFavorites) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(16.dp))
+                                        Text("الخدمات والمهنيين والمحلات المفضلة (${favorites.size})", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                    }
+
+                                    val faveProviders = providers.filter { favorites.contains(it.id) }
+                                    if (faveProviders.isEmpty()) {
+                                        Text("لا توجد خدمات في مذكرتك المفضلة حالياً. تفضل بتصفح الأقسام واضغط على علامة النجمة (⭐) لحفظها هنا للرجوع الفوري الفائق!", color = Color.Gray, fontSize = 11.sp, lineHeight = 16.sp)
+                                    } else {
+                                        faveProviders.forEach { p ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        activeProviderDetailSheet = p
+                                                        showDashboardDialog = false
+                                                    }
+                                                    .padding(10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(p.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                        if (p.isSubscribed) {
+                                                            Icon(Icons.Default.Verified, contentDescription = null, tint = Color(0xFF3897F0), modifier = Modifier.size(12.dp))
+                                                        }
+                                                    }
+                                                    Text("الحرفة: ${p.address} | الهاتف: ${p.phone}", color = Color.Gray, fontSize = 10.sp)
+                                                }
+                                                IconButton(
+                                                    onClick = { FirestoreSim.toggleFavorite(context, p.id) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "إزالة", tint = AlertRed, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val historyBlock = @Composable {
+                            if (configs.showDashboardCallHistory) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(Icons.Default.Call, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            Text("سجل ومذكرات التواصل التاريخية (${contactHistory.size})", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                        }
+                                        if (contactHistory.isNotEmpty()) {
+                                            TextButton(
+                                                onClick = {
+                                                    FirestoreSim.clearContactHistory(context)
+                                                    Toast.makeText(context, "تم تصفير وتطهير سجل التواصل بنجاح!", Toast.LENGTH_SHORT).show()
+                                                },
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Text("تفريغ السجل", color = AlertRed, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }
+
+                                    if (contactHistory.isEmpty()) {
+                                        Text("سجل تواصلك خالٍ بالكامل في هذا الوقت. أي اتصال تجريه بالضغط على زر (اتصال) أو (واتساب) سيقيد تلقائياً وسرياً هنا مع التوقيت المزدوج!", color = Color.Gray, fontSize = 11.sp, lineHeight = 16.sp)
+                                    } else {
+                                        contactHistory.sortedByDescending { it.timestamp }.forEach { log ->
+                                            val p = providers.find { it.id == log.providerId }
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        if (p != null) {
+                                                            activeProviderDetailSheet = p
+                                                            showDashboardDialog = false
+                                                        }
+                                                    }
+                                                    .padding(10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(p?.name ?: "مهني غير مسجل حالياً", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                    Text("وسيلة الاتصال: ${log.mode} | هاتف: ${p?.phone ?: "غير متوفر"}", color = Color.LightGray, fontSize = 10.sp)
+                                                    Text("تفاصيل التوقيت: ${log.timestamp}", color = Color.Gray, fontSize = 9.sp)
+                                                }
+                                                Icon(
+                                                    imageVector = if (log.mode == "واتساب") Icons.Default.ChatBubble else Icons.Default.Call,
+                                                    contentDescription = null,
+                                                    tint = if (log.mode == "واتساب") Color(0xFF25D366) else MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Order switching
+                        if (configs.dashboardFavoritesFirst) {
+                            favsBlock()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            historyBlock()
+                        } else {
+                            historyBlock()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            favsBlock()
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
