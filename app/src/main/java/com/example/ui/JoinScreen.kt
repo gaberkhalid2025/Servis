@@ -76,6 +76,7 @@ fun JoinScreen(
     var avatarError by remember { mutableStateOf(false) }
 
     var showImageSourceSheet by remember { mutableStateOf(false) }
+    var showIdCardSourceSheet by remember { mutableStateOf(false) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -94,6 +95,24 @@ fun JoinScreen(
             avatarImageUri = "camera_capture_${System.currentTimeMillis()}"
             avatarError = false
             Toast.makeText(context, "تم التقاط الصورة بالكاميرا بنجاح!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val idCardGalleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            idCardImageUri = uri.toString()
+            Toast.makeText(context, "تم اختيار بطاقة الهوية من الاستوديو بنجاح!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val idCardCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: android.graphics.Bitmap? ->
+        if (bitmap != null) {
+            idCardImageUri = "camera_capture_id_${System.currentTimeMillis()}"
+            Toast.makeText(context, "تم التقاط صورة بطاقة الهوية بالكاميرا بنجاح!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -187,40 +206,42 @@ fun JoinScreen(
 
         // --- Field 3: القسم الرئيسي المنسدل (إجباري) ---
         Box(modifier = Modifier.fillMaxWidth()) {
-            ExposedDropdownMenuBox(
-                expanded = mainCatExpanded,
-                onExpandedChange = { mainCatExpanded = !mainCatExpanded }
-            ) {
-                OutlinedTextField(
-                    value = mainCats.find { it.id == selectedMainCat }?.name ?: "اختر القسم والتصنيف الرئيسي...",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("القسم الرئيسي (إجباري)") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = mainCatExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    isError = mainCatError,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = writeTextColor,
-                        unfocusedTextColor = writeTextColor,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Gray
-                    )
+            OutlinedTextField(
+                value = mainCats.find { it.id == selectedMainCat }?.name ?: "اختر القسم والتصنيف الرئيسي...",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("القسم الرئيسي (إجباري)") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = mainCatExpanded) },
+                modifier = Modifier.fillMaxWidth(),
+                isError = mainCatError,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = writeTextColor,
+                    unfocusedTextColor = writeTextColor,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = Color.Gray
                 )
-                ExposedDropdownMenu(
-                    expanded = mainCatExpanded,
-                    onDismissRequest = { mainCatExpanded = false }
-                ) {
-                    mainCats.forEach { item ->
-                        DropdownMenuItem(
-                            text = { Text(item.name, fontWeight = FontWeight.Bold) },
-                            onClick = {
-                                selectedMainCat = item.id
-                                selectedSubCat = "" // Reset sub category dependency chain!
-                                mainCatExpanded = false
-                                mainCatError = false
-                            }
-                        )
-                    }
+            )
+            // Transparent overlay box to intercept clicks and toggle dropdown reliably
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { mainCatExpanded = true }
+            )
+            DropdownMenu(
+                expanded = mainCatExpanded,
+                onDismissRequest = { mainCatExpanded = false },
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                mainCats.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(item.name, fontWeight = FontWeight.Bold) },
+                        onClick = {
+                            selectedMainCat = item.id
+                            selectedSubCat = "" // Reset sub category dependency chain!
+                            mainCatExpanded = false
+                            mainCatError = false
+                        }
+                    )
                 }
             }
         }
@@ -235,39 +256,41 @@ fun JoinScreen(
             exit = shrinkVertically() + fadeOut()
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                ExposedDropdownMenuBox(
-                    expanded = subCatExpanded,
-                    onExpandedChange = { subCatExpanded = !subCatExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = subCats.find { it.id == selectedSubCat }?.name ?: "اختر المهن أو التخصص المتاح...",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("المهنة أو الخدمة الدقيقة (إجباري)") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subCatExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        isError = subCatError,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = writeTextColor,
-                            unfocusedTextColor = writeTextColor,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = Color.Gray
-                        )
+                OutlinedTextField(
+                    value = subCats.find { it.id == selectedSubCat }?.name ?: "اختر المهن أو التخصص المتاح...",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("المهنة أو الخدمة الدقيقة (إجباري)") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subCatExpanded) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = subCatError,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = writeTextColor,
+                        unfocusedTextColor = writeTextColor,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Gray
                     )
-                    ExposedDropdownMenu(
-                        expanded = subCatExpanded,
-                        onDismissRequest = { subCatExpanded = false }
-                    ) {
-                        filteredSubCats.forEach { item ->
-                            DropdownMenuItem(
-                                text = { Text(item.name) },
-                                onClick = {
-                                    selectedSubCat = item.id
-                                    subCatExpanded = false
-                                    subCatError = false
-                                }
-                            )
-                        }
+                )
+                // Transparent overlay box to intercept clicks and toggle dropdown reliably
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { subCatExpanded = true }
+                )
+                DropdownMenu(
+                    expanded = subCatExpanded,
+                    onDismissRequest = { subCatExpanded = false },
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    filteredSubCats.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item.name) },
+                            onClick = {
+                                selectedSubCat = item.id
+                                subCatExpanded = false
+                                subCatError = false
+                            }
+                        )
                     }
                 }
             }
@@ -302,42 +325,44 @@ fun JoinScreen(
 
         // --- Field 6: منطقة الدائرة السكنية الحالية (إجباري) ---
         Box(modifier = Modifier.fillMaxWidth()) {
-            ExposedDropdownMenuBox(
-                expanded = districtExpanded,
-                onExpandedChange = { districtExpanded = !districtExpanded }
-            ) {
-                OutlinedTextField(
-                    value = districtArea,
-                    onValueChange = {
-                        districtArea = it
-                        districtError = false
-                    },
-                    label = { Text("منطقة المديرية / الدائرة السكنية (إجباري)") },
-                    placeholder = { Text("مثال: مديرية السبعين") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = districtExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    isError = districtError,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = writeTextColor,
-                        unfocusedTextColor = writeTextColor,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Gray
-                    )
+            OutlinedTextField(
+                value = districtArea,
+                onValueChange = {
+                    districtArea = it
+                    districtError = false
+                },
+                label = { Text("منطقة المديرية / الدائرة السكنية (إجباري)") },
+                placeholder = { Text("مثال: مديرية السبعين") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = districtExpanded) },
+                modifier = Modifier.fillMaxWidth(),
+                isError = districtError,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = writeTextColor,
+                    unfocusedTextColor = writeTextColor,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = Color.Gray
                 )
-                ExposedDropdownMenu(
-                    expanded = districtExpanded,
-                    onDismissRequest = { districtExpanded = false }
-                ) {
-                    defaultDistricts.forEach { dist ->
-                        DropdownMenuItem(
-                            text = { Text(dist) },
-                            onClick = {
-                                districtArea = dist
-                                districtExpanded = false
-                                districtError = false
-                            }
-                        )
-                    }
+            )
+            // Transparent overlay box to intercept clicks and toggle dropdown reliably
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { districtExpanded = true }
+            )
+            DropdownMenu(
+                expanded = districtExpanded,
+                onDismissRequest = { districtExpanded = false },
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                defaultDistricts.forEach { dist ->
+                    DropdownMenuItem(
+                        text = { Text(dist) },
+                        onClick = {
+                            districtArea = dist
+                            districtExpanded = false
+                            districtError = false
+                        }
+                    )
                 }
             }
         }
@@ -509,21 +534,86 @@ fun JoinScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("صورة بطاقة الهوية الشخصية (اختياري)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
                     Text(
-                        text = if (idCardImageUri.isEmpty()) "لم ترفق بطاقة الهوية العائلية" else "تم تحميل: national_id_card.png ✓",
+                        text = if (idCardImageUri.isEmpty()) "لم ترفق بطاقة الهوية العائلية" else "تم تحميل بطاقة الهوية بنجاح ✓",
                         color = if (idCardImageUri.isEmpty()) SoftWhite else MaterialTheme.colorScheme.primary,
                         fontSize = 11.sp
                     )
                 }
                 OutlinedButton(
                     onClick = {
-                        idCardImageUri = "id_card_uploaded_${System.currentTimeMillis()}"
-                        Toast.makeText(context, "تم مسح بطاقة الهوية الوطنية بنجاح!", Toast.LENGTH_SHORT).show()
+                        showIdCardSourceSheet = true
                     },
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                 ) {
-                    Icon(Icons.Default.Upload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("إرفاق البطاقة", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        // --- Custom ID Card Image Selection Source Dialog/Menu ---
+        if (showIdCardSourceSheet) {
+            Dialog(onDismissRequest = { showIdCardSourceSheet = false }) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text("طريقة التقاط/رفع بطاقة الهوية 🪪", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("يرجى اختيار التقاط فوري ومباشر بكاميرا الهاتف أو اختيار صورة بطاقة الهوية من الاستوديو المتاح.", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+
+                        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Camera Option
+                            Button(
+                                onClick = {
+                                    showIdCardSourceSheet = false
+                                    try {
+                                        idCardCameraLauncher.launch()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "عذراً، لم تتم تهيئة الكاميرا بالبيئة الحالية.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("الكاميرا 📷", fontSize = 12.sp)
+                            }
+
+                            // Gallery Option
+                            Button(
+                                onClick = {
+                                    showIdCardSourceSheet = false
+                                    idCardGalleryLauncher.launch("image/*")
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                            ) {
+                                Icon(Icons.Default.Photo, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("الاستوديو 🖼️", fontSize = 12.sp)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { showIdCardSourceSheet = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("إلغاء")
+                        }
+                    }
                 }
             }
         }

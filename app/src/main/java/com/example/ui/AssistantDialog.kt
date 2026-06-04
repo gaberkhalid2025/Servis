@@ -142,7 +142,8 @@ fun AssistantDialog(
                     }
                 }
 
-                // Preset suggestion chips
+                // Preset suggestion chips hidden as requested because answers don't show there
+                /*
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -172,6 +173,7 @@ fun AssistantDialog(
                         }
                     }
                 }
+                */
 
                 // Text input box with yellow border
                 OutlinedTextField(
@@ -237,14 +239,14 @@ fun BubbleChat(message: Message) {
     val isUser = message.isUser
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     val bgColor = if (isUser) {
-        MaterialTheme.colorScheme.primary
+        Color(0xFFFFD700) // Distinct gold color for user
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        Color(0xFF2C2C32) // Contrasting slate gray for assistant
     }
     val textColor = if (isUser) {
-        MaterialTheme.colorScheme.onPrimary
+        Color.Black // Black text on gold background
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color.White // White text on dark gray background
     }
 
     Box(
