@@ -1035,6 +1035,19 @@ fun UserDashboardSettingsTab(
     var favsFirst by remember { mutableStateOf(configs.dashboardFavoritesFirst) }
 
     val context = LocalContext.current
+    val citySettings = FirestoreSim.cities.collectAsState()
+
+    // Dialog states for add/edit in Admin context
+    var showAddCityDialog by remember { mutableStateOf(false) }
+    var cityNameInput by remember { mutableStateOf("") }
+    var districtsInput by remember { mutableStateOf("") }
+    var countryNameInput by remember { mutableStateOf("اليمن") }
+
+    var showEditCityDialog by remember { mutableStateOf(false) }
+    var editingCityId by remember { mutableStateOf("") }
+    var editCityNameInput by remember { mutableStateOf("") }
+    var editDistrictsInput by remember { mutableStateOf("") }
+    var editCountryInput by remember { mutableStateOf("اليمن") }
 
     Column(
         modifier = Modifier
@@ -1131,6 +1144,219 @@ fun UserDashboardSettingsTab(
             shape = RoundedCornerShape(8.dp)
         ) {
             Text("حفظ التكوين والتخصيص", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+        }
+
+        Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
+
+        // --- Standard Admin access to management of countries, governorates, and cities (as requested!) ---
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("لوحة التحكم بالدول والمحافظات والمدن 🗺️", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("إضافة وتعديل دول ومحافظات ومديريات دليل الخدمات", fontSize = 10.sp, color = Color.LightGray)
+                    }
+                    Button(
+                        onClick = { showAddCityDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("إضافة دولة/محافظة ➕", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Divider(color = Color.DarkGray)
+
+                if (citySettings.value.isEmpty()) {
+                    Text("لا توجد نطاقات جغرافية مضافة حالياً بالفلاتر.", color = Color.Gray, fontSize = 11.sp)
+                } else {
+                    citySettings.value.forEach { city ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121214)),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("${city.country} 🌍 / ${city.name}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                                        Text("المناطق: ${city.districts.joinToString(" • ")}", fontSize = 10.sp, color = Color.LightGray)
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        IconButton(
+                                            onClick = {
+                                                editingCityId = city.id
+                                                editCityNameInput = city.name
+                                                editDistrictsInput = city.districts.joinToString(", ")
+                                                editCountryInput = city.country
+                                                showEditCityDialog = true
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                FirestoreSim.deleteCity(context, city.id)
+                                                Toast.makeText(context, "تم حذف المدينة/المحافظة تماماً!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = AlertRed, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Add dialog inside Admin context
+    if (showAddCityDialog) {
+        Dialog(onDismissRequest = { showAddCityDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("إضافة فلاتر جغرافية جديدة 🗺️", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+
+                    OutlinedTextField(
+                        value = countryNameInput,
+                        onValueChange = { countryNameInput = it },
+                        label = { Text("الدولة (مثل: اليمن، السعودية، مصر)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = cityNameInput,
+                        onValueChange = { cityNameInput = it },
+                        label = { Text("اسم المحافظة / المدينة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = districtsInput,
+                        onValueChange = { districtsInput = it },
+                        label = { Text("المدن والمديريات بداخلها (مفصولة بفاصلة)") },
+                        placeholder = { Text("مثال: حي المنصورة, كريتر, حي المعلا") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = { showAddCityDialog = false }, modifier = Modifier.weight(1f)) {
+                            Text("إلغاء")
+                        }
+                        Button(
+                            onClick = {
+                                if (cityNameInput.isNotBlank() && districtsInput.isNotBlank() && countryNameInput.isNotBlank()) {
+                                    val dstList = districtsInput.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                    FirestoreSim.addCity(context, cityNameInput, dstList, countryNameInput)
+                                    showAddCityDialog = false
+                                    cityNameInput = ""
+                                    districtsInput = ""
+                                    countryNameInput = "اليمن"
+                                    Toast.makeText(context, "تم إضافة الفلتر الجغرافي بنجاح!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("إضافة ➕", fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Edit dialog inside Admin context
+    if (showEditCityDialog) {
+        Dialog(onDismissRequest = { showEditCityDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("تعديل الفلاتر الجغرافية المعتمدة ✏️", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+
+                    OutlinedTextField(
+                        value = editCountryInput,
+                        onValueChange = { editCountryInput = it },
+                        label = { Text("الدولة (مثل: اليمن، السعودية، مصر 🌍)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCityNameInput,
+                        onValueChange = { editCityNameInput = it },
+                        label = { Text("المحافظة / المدينة الجغرافية") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editDistrictsInput,
+                        onValueChange = { editDistrictsInput = it },
+                        label = { Text("الأحياء والمناطق (مفصولة بفاصلة)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = { showEditCityDialog = false }, modifier = Modifier.weight(1f)) {
+                            Text("إلغاء")
+                        }
+                        Button(
+                            onClick = {
+                                if (editCityNameInput.isNotBlank() && editDistrictsInput.isNotBlank() && editCountryInput.isNotBlank()) {
+                                    val dstList = editDistrictsInput.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                    FirestoreSim.editCity(context, editingCityId, editCityNameInput, dstList, editCountryInput)
+                                    showEditCityDialog = false
+                                    Toast.makeText(context, "تم حفظ وتحديث التعديل!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("حفظ 💾", fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+                    }
+                }
+            }
         }
     }
 }

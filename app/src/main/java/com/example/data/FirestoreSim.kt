@@ -556,10 +556,18 @@ object FirestoreSim {
     }
 
     // Cities Controls
-    fun addCity(context: Context, name: String, districts: List<String>) {
+    fun addCity(context: Context, name: String, districts: List<String>, country: String = "اليمن") {
         val current = _cities.value.toMutableList()
-        current.add(City("c_${System.currentTimeMillis()}", name, districts))
+        current.add(City("c_${System.currentTimeMillis()}", name, districts, country))
         _cities.value = current
+        saveToDisk(context)
+        triggerUpdate("admins")
+    }
+
+    fun editCity(context: Context, cityId: String, name: String, districts: List<String>, country: String = "اليمن") {
+        _cities.value = _cities.value.map {
+            if (it.id == cityId) it.copy(name = name, districts = districts, country = country) else it
+        }
         saveToDisk(context)
         triggerUpdate("admins")
     }
@@ -672,7 +680,7 @@ object FirestoreSim {
             builder.append("REPORT|${it.id}|${it.providerId}|${it.userName}|${it.comment}\n")
         }
         _cities.value.forEach {
-            builder.append("CITY|${it.id}|${it.name}|${it.districts.joinToString(",")}\n")
+            builder.append("CITY|${it.id}|${it.name}|${it.districts.joinToString(",")}|${it.country}\n")
         }
         return builder.toString()
     }
@@ -747,9 +755,12 @@ object FirestoreSim {
                         }
                     }
                     "CITY" -> {
-                        if (parts.size >= 4) {
+                        if (parts.size >= 5) {
                             val districts = parts[3].split(",").filter { it.isNotBlank() }
-                            newCities.add(City(parts[1], parts[2], districts))
+                            newCities.add(City(parts[1], parts[2], districts, parts[4]))
+                        } else if (parts.size >= 4) {
+                            val districts = parts[3].split(",").filter { it.isNotBlank() }
+                            newCities.add(City(parts[1], parts[2], districts, "اليمن"))
                         }
                     }
                 }
@@ -907,13 +918,17 @@ object FirestoreSim {
     }
 
     private fun serializeCities(list: List<City>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.districts.joinToString("|")}" }
+        return list.joinToString(";") { "${it.id},${it.name},${it.districts.joinToString("|")},${it.country}" }
     }
     private fun deserializeCities(s: String): List<City> {
         if (s.isBlank()) return emptyList()
         return s.split(";").mapNotNull {
             val p = it.split(",")
-            if (p.size >= 3) City(p[0], p[1], p[2].split("|").filter { d -> d.isNotBlank() }) else null
+            if (p.size >= 4) {
+                City(p[0], p[1], p[2].split("|").filter { d -> d.isNotBlank() }, p[3])
+            } else if (p.size >= 3) {
+                City(p[0], p[1], p[2].split("|").filter { d -> d.isNotBlank() }, "اليمن")
+            } else null
         }
     }
 
