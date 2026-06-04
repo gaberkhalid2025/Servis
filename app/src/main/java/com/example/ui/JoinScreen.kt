@@ -1,678 +1,517 @@
 package com.example.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.text.style.TextAlign
+import androidx.core.content.ContextCompat
 import com.example.data.FirestoreSim
-import com.example.data.PendingProvider
-import com.example.ui.theme.AlertRed
-import com.example.ui.theme.getSelectedTextColor
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JoinScreen(
-    onBack: () -> Unit
-) {
+fun JoinScreen(onNavigateBack: () -> Unit) {
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
-
-    // Config textColor from settings
-    val appColors = FirestoreSim.appColors.collectAsState()
-    val writeTextColor = getSelectedTextColor(appColors.value.textColorName)
-
-    // Data lists from FirestoreSim
-    val mainCats = FirestoreSim.mainCategories.collectAsState().value
-    val subCats = FirestoreSim.subCategories.collectAsState().value
-    val cities = FirestoreSim.cities.collectAsState().value
-
-    // Form inputs state
-    var fullName by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var selectedMainCat by remember { mutableStateOf("") }
-    var selectedSubCat by remember { mutableStateOf("") }
-    var addressDetails by remember { mutableStateOf("") }
-    var districtArea by remember { mutableStateOf("") }
-    var gpsCoordinates by remember { mutableStateOf("") }
-    var avatarImageUri by remember { mutableStateOf("") }
-    var idCardImageUri by remember { mutableStateOf("") }
+    var region by remember { mutableStateOf("صنعاء - شارع حدة") }
 
-    // Dropdown toggle states
-    var mainCatExpanded by remember { mutableStateOf(false) }
-    var subCatExpanded by remember { mutableStateOf(false) }
-    var districtExpanded by remember { mutableStateOf(false) }
+    // Uploaded paths simulator
+    var selfieUri by remember { mutableStateOf("") }
+    var idCardUri by remember { mutableStateOf("") }
 
-    // Error messages
-    var nameError by remember { mutableStateOf(false) }
-    var phoneError by remember { mutableStateOf(false) }
-    var mainCatError by remember { mutableStateOf(false) }
-    var subCatError by remember { mutableStateOf(false) }
-    var addressError by remember { mutableStateOf(false) }
-    var districtError by remember { mutableStateOf(false) }
-    var avatarError by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
-    var showImageSourceSheet by remember { mutableStateOf(false) }
-    var showIdCardSourceSheet by remember { mutableStateOf(false) }
-
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: android.net.Uri? ->
-        if (uri != null) {
-            avatarImageUri = uri.toString()
-            avatarError = false
-            Toast.makeText(context, "تم اختيار الصورة من الاستوديو بنجاح!", Toast.LENGTH_SHORT).show()
+    // Camera hardware logic simulators
+    var showCameraSim by remember { mutableStateOf(false) }
+    var cameraMode by remember { mutableStateOf("selfie") } // or 'id'
+    
+    // Permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showCameraSim = true
+        } else {
+            Toast.makeText(context, "يرجى منح صلاحية الكاميرا لالتقاط الصورة مباشرة", Toast.LENGTH_LONG).show()
         }
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: android.graphics.Bitmap? ->
-        if (bitmap != null) {
-            avatarImageUri = "camera_capture_${System.currentTimeMillis()}"
-            avatarError = false
-            Toast.makeText(context, "تم التقاط الصورة بالكاميرا بنجاح!", Toast.LENGTH_SHORT).show()
-        }
-    }
+    val regionOptions = listOf(
+        "صنعاء - شارع حدة",
+        "صنعاء - باب اليمن",
+        "عدن - كريتر",
+        "عدن - المنصورة",
+        "تعز - شارع جمال",
+        "الحديدة - شارع صنعاء",
+        "حضرموت - المكلا"
+    )
 
-    val idCardGalleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: android.net.Uri? ->
-        if (uri != null) {
-            idCardImageUri = uri.toString()
-            Toast.makeText(context, "تم اختيار بطاقة الهوية من الاستوديو بنجاح!", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val idCardCameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: android.graphics.Bitmap? ->
-        if (bitmap != null) {
-            idCardImageUri = "camera_capture_id_${System.currentTimeMillis()}"
-            Toast.makeText(context, "تم التقاط صورة بطاقة الهوية بالكاميرا بنجاح!", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Cascaded sub-categories helper list
-    val filteredSubCats = remember(selectedMainCat) {
-        subCats.filter { it.parentId == selectedMainCat }
-    }
-
-    // Load Yemeni districts based on selections
-    val defaultDistricts = remember {
-        cities.flatMap { it.districts }.distinct()
-    }
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-            .verticalScroll(scrollState),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // App title
-        Text(
-            text = "استمارة تسجيل الكوادر والمهنيين",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-
-        Text(
-            text = "انضم إلينا ليرى خدماتك الآلاف من الباحثين يومياً في منطقتك السكنية فوراً وبكل سهولة. يرجى إدخال بيانات صحيحة للمراجعة التلقائية.",
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = 0.7f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            lineHeight = 18.sp,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-
-        // --- Field 1: الاسم الثلاثي الكامل (إجباري) ---
-        OutlinedTextField(
-            value = fullName,
-            onValueChange = {
-                fullName = it
-                nameError = false
-            },
-            label = { Text("الاسم الثلاثي الكامل (إجباري)") },
-            placeholder = { Text("مثال: ماهر محمد طاهر") },
-            isError = nameError,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = writeTextColor,
-                unfocusedTextColor = writeTextColor,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Gray
-            ),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-        )
-        if (nameError) {
-            Text("يرجى إدخال الاسم الثلاثي بالكامل", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
-
-        // --- Field 2: رقم الهاتف والواتساب (إجباري) ---
-        OutlinedTextField(
-            value = phone,
-            onValueChange = {
-                phone = it
-                phoneError = false
-            },
-            label = { Text("رقم الهاتف أو الواتساب الفعال (إجباري)") },
-            placeholder = { Text("مثال: 777644670") },
-            isError = phoneError,
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = writeTextColor,
-                unfocusedTextColor = writeTextColor,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Gray
-            ),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-        )
-        if (phoneError) {
-            Text("يرجى إدخال رقم هاتف يمني صحيح فعال يتألف من 9 أرقام", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
-
-        // --- Field 3: القسم الرئيسي المنسدل (إجباري) ---
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = mainCats.find { it.id == selectedMainCat }?.name ?: "اختر القسم والتصنيف الرئيسي...",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("القسم الرئيسي (إجباري)") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = mainCatExpanded) },
-                modifier = Modifier.fillMaxWidth(),
-                isError = mainCatError,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = writeTextColor,
-                    unfocusedTextColor = writeTextColor,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = Color.Gray
-                )
-            )
-            // Transparent overlay box to intercept clicks and toggle dropdown reliably
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header
+            Row(
                 modifier = Modifier
-                    .matchParentSize()
-                    .clickable { mainCatExpanded = true }
-            )
-            DropdownMenu(
-                expanded = mainCatExpanded,
-                onDismissRequest = { mainCatExpanded = false },
-                modifier = Modifier.fillMaxWidth(0.9f)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                mainCats.forEach { item ->
-                    DropdownMenuItem(
-                        text = { Text(item.name, fontWeight = FontWeight.Bold) },
-                        onClick = {
-                            selectedMainCat = item.id
-                            selectedSubCat = "" // Reset sub category dependency chain!
-                            mainCatExpanded = false
-                            mainCatError = false
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface, CircleShape)
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
+                Text(
+                    text = "طلب انضمام مقدم خدمة 🛠️+",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+
+            Text(
+                text = "انضم إلى نخبة الفنيين والحرفيين في اليمن. بعد ملء البيانات، سيقوم المشرف العام بمراجعة طلبك وتوثيق حسابك بالشارة الزرقاء في غضون ٢٤ ساعة.",
+                fontSize = 12.sp,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            // Form Cards
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("البيانات الشخصية والمهنية", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("الاسم الكامل بالخط العربي الثلاثي") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        leadingIcon = { Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("المسمى المهني (مثال: سباك فني تركيب فلاتر)") },
+                        placeholder = { Text("مثال: مهندس شبكات وتمديدات طاقة") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        leadingIcon = { Icon(Icons.Default.Build, null) }
+                    )
+
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text("رقم الهاتف اليمني النشط (مكالمات + واتساب)") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        leadingIcon = { Icon(Icons.Default.Phone, null) }
+                    )
+
+                    OutlinedTextField(
+                        value = bio,
+                        onValueChange = { bio = it },
+                        label = { Text("نبذة مختصرة عن الخبرات والمعدات المتاحة") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        minLines = 3,
+                        maxLines = 5
+                    )
+
+                    // Region Selector Dropdown
+                    Text("منطقة التواجد والخدمات الميدانية:", fontSize = 12.sp, color = Color.LightGray, modifier = Modifier.padding(bottom = 6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        regionOptions.forEach { r ->
+                            val isSelected = region == r
+                            val bg = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF374151)
+                            Text(
+                                text = r,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(30.dp))
+                                    .background(bg)
+                                    .clickable { region = r }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Identification documents and selfie picker card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("المستندات الأمنية والتوثيق (ذاتي + هوية)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
+
+                    // Selfie block
+                    DocumentPickerItem(
+                        title = "صورة سيلفي واضحة (Selfie)",
+                        description = "صورة ملتقطة لوجهك بوضوح بمكان مضاء لتوثيق الهوية لمكافحة الاحتيال.",
+                        uri = selfieUri,
+                        onPickLocal = { selfieUri = "selfie_mock_upload.png" },
+                        onCaptureLive = {
+                            cameraMode = "selfie"
+                            // Check Camera Permissions
+                            val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                            if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                                showCameraSim = true
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // ID Card block
+                    DocumentPickerItem(
+                        title = "البطاقة الشخصية أو جواز السفر",
+                        description = "صورة ضوئية واضحة للوجه الأمامي للبطاقة الشخصية اليمنية الموثقة.",
+                        uri = idCardUri,
+                        onPickLocal = { idCardUri = "yemeny_id_card_mock.png" },
+                        onCaptureLive = {
+                            cameraMode = "id"
+                            val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                            if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                                showCameraSim = true
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         }
                     )
                 }
             }
-        }
-        if (mainCatError) {
-            Text("يرجى اختيار القسم الرئيسي أولاً لتصفية المهن", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
 
-        // --- Field 4: الخدمة النوعية أو المهنة (إجباري) ---
-        AnimatedVisibility(
-            visible = selectedMainCat.isNotEmpty(),
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = subCats.find { it.id == selectedSubCat }?.name ?: "اختر المهن أو التخصص المتاح...",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("المهنة أو الخدمة الدقيقة (إجباري)") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subCatExpanded) },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = subCatError,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = writeTextColor,
-                        unfocusedTextColor = writeTextColor,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Gray
-                    )
-                )
-                // Transparent overlay box to intercept clicks and toggle dropdown reliably
-                Box(
+            // Error notice if documents are missing
+            if (selfieUri.isEmpty() || idCardUri.isEmpty()) {
+                Row(
                     modifier = Modifier
-                        .matchParentSize()
-                        .clickable { subCatExpanded = true }
-                )
-                DropdownMenu(
-                    expanded = subCatExpanded,
-                    onDismissRequest = { subCatExpanded = false },
-                    modifier = Modifier.fillMaxWidth(0.9f)
+                        .fillMaxWidth()
+                        .background(Color(0xFFFEF3C7), RoundedCornerShape(8.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    filteredSubCats.forEach { item ->
-                        DropdownMenuItem(
-                            text = { Text(item.name) },
-                            onClick = {
-                                selectedSubCat = item.id
-                                subCatExpanded = false
-                                subCatError = false
-                            }
-                        )
-                    }
-                }
-            }
-        }
-        if (subCatError && selectedMainCat.isNotEmpty()) {
-            Text("يرجى تحديد تخصص الخدمة كشريك مهني", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
-
-        // --- Field 5: مكان وعنوان مركز العمل الحالي (إجباري) ---
-        OutlinedTextField(
-            value = addressDetails,
-            onValueChange = {
-                addressDetails = it
-                addressError = false
-            },
-            label = { Text("عنوان العمل والشارع (إجباري)") },
-            placeholder = { Text("مثال: شارع حدة - أمام بريد السبعين") },
-            isError = addressError,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = writeTextColor,
-                unfocusedTextColor = writeTextColor,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Gray
-            ),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-        )
-        if (addressError) {
-            Text("يرجى إدخال عنوان وتفاصيل مكتب العمل الفعلي", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
-
-        // --- Field 6: منطقة الدائرة السكنية الحالية (إجباري) ---
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = districtArea,
-                onValueChange = {
-                    districtArea = it
-                    districtError = false
-                },
-                label = { Text("منطقة المديرية / الدائرة السكنية (إجباري)") },
-                placeholder = { Text("مثال: مديرية السبعين") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = districtExpanded) },
-                modifier = Modifier.fillMaxWidth(),
-                isError = districtError,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = writeTextColor,
-                    unfocusedTextColor = writeTextColor,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = Color.Gray
-                )
-            )
-            // Transparent overlay box to intercept clicks and toggle dropdown reliably
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clickable { districtExpanded = true }
-            )
-            DropdownMenu(
-                expanded = districtExpanded,
-                onDismissRequest = { districtExpanded = false },
-                modifier = Modifier.fillMaxWidth(0.9f)
-            ) {
-                defaultDistricts.forEach { dist ->
-                    DropdownMenuItem(
-                        text = { Text(dist) },
-                        onClick = {
-                            districtArea = dist
-                            districtExpanded = false
-                            districtError = false
-                        }
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD97706))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ملاحظة: يتطلب رفع ملف السيلفي وبطاقة الهوية الوطنية لتفعيل الحساب بنجاح ووضعه في الصدارة للزوار.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF92400E)
                     )
                 }
+                Spacer(modifier = Modifier.height(20.dp))
             }
-        }
-        if (districtError) {
-            Text("يرجى اختيار أو تدوين منطقة تواجدك السكنية", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
 
-        // --- Field 7: إحداثيات وموقع الخريطة GPS (اختياري) ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = gpsCoordinates,
-                onValueChange = { gpsCoordinates = it },
-                label = { Text("إحداثيات وموقع GPS (اختياري)") },
-                placeholder = { Text("مثال: 15.3184, 44.1950") },
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = writeTextColor,
-                    unfocusedTextColor = writeTextColor,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = Color.Gray
-                ),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.PinDrop, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-            )
+            // Action submit button
             Button(
                 onClick = {
-                    gpsCoordinates = "15.3694,44.1910" // Mock location fetch
-                    Toast.makeText(context, "تم جلب موقع الخريطة GPS بنجاح!", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("تحديد موقعي")
-            }
-        }
-
-        // --- Field 8: تحميل الصورة الشخصية للملف (إجباري) ---
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = if (avatarError) AlertRed else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = CardDefaults.cardColors(containerColor = CardDefaults.cardColors().containerColor),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("الصورة الشخصية للملف (إجباري)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                    Text(
-                        text = if (avatarImageUri.isEmpty()) "لم يتم اختيار صورة بعد" else if (avatarImageUri.startsWith("camera_capture")) "تم الالتقاط بالكاميرا الفورية ✓" else "تم الاختيار من الاستوديو ✓",
-                        color = if (avatarImageUri.isEmpty()) Color.LightGray else MaterialTheme.colorScheme.primary,
-                        fontSize = 11.sp
-                    )
-                }
-                Button(
-                    onClick = {
-                        showImageSourceSheet = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("رفع الصورة")
-                }
-            }
-        }
-        if (avatarError) {
-            Text("رفع الصورة الشخصية إجباري لمطابقة الملف الفني", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
-        }
-
-        // --- Custom Image Selection Source Dialog/Menu ---
-        if (showImageSourceSheet) {
-            Dialog(onDismissRequest = { showImageSourceSheet = false }) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Text("طريقة التقاط/رفع الصورة 👤", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
-                        Text("يرجى اختيار التقاط فوري ومباشر بكاميرا الهاتف أو اختيار صورة من استوديو الصور المتاح.", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)
-
-                        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Camera Option
-                            Button(
-                                onClick = {
-                                    showImageSourceSheet = false
-                                    try {
-                                        cameraLauncher.launch()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "عذراً، لم تتم تهيئة الكاميرا بالبيئة الحالية.", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("الكاميرا 📷", fontSize = 12.sp)
-                            }
-
-                            // Gallery Option
-                            Button(
-                                onClick = {
-                                    showImageSourceSheet = false
-                                    galleryLauncher.launch("image/*")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
-                            ) {
-                                Icon(Icons.Default.Photo, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("الاستوديو 🖼️", fontSize = 12.sp)
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = { showImageSourceSheet = false },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("إلغاء")
-                        }
+                    if (name.isEmpty() || title.isEmpty() || phone.isEmpty()) {
+                        Toast.makeText(context, "الرجاء تعبئة البيانات الأساسية (الاسم والمسمى ورقم الهاتف)", Toast.LENGTH_LONG).show()
+                        return@Button
                     }
-                }
-            }
-        }
-
-        // --- Field 9: صورة بطاقة الهوية الشخصية (اختياري) ---
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("صورة بطاقة الهوية الشخصية (اختياري)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                    Text(
-                        text = if (idCardImageUri.isEmpty()) "لم ترفق بطاقة الهوية العائلية" else "تم تحميل بطاقة الهوية بنجاح ✓",
-                        color = if (idCardImageUri.isEmpty()) SoftWhite else MaterialTheme.colorScheme.primary,
-                        fontSize = 11.sp
-                    )
-                }
-                OutlinedButton(
-                    onClick = {
-                        showIdCardSourceSheet = true
-                    },
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("إرفاق البطاقة", color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-
-        // --- Custom ID Card Image Selection Source Dialog/Menu ---
-        if (showIdCardSourceSheet) {
-            Dialog(onDismissRequest = { showIdCardSourceSheet = false }) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Text("طريقة التقاط/رفع بطاقة الهوية 🪪", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
-                        Text("يرجى اختيار التقاط فوري ومباشر بكاميرا الهاتف أو اختيار صورة بطاقة الهوية من الاستوديو المتاح.", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)
-
-                        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Camera Option
-                            Button(
-                                onClick = {
-                                    showIdCardSourceSheet = false
-                                    try {
-                                        idCardCameraLauncher.launch()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "عذراً، لم تتم تهيئة الكاميرا بالبيئة الحالية.", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("الكاميرا 📷", fontSize = 12.sp)
-                            }
-
-                            // Gallery Option
-                            Button(
-                                onClick = {
-                                    showIdCardSourceSheet = false
-                                    idCardGalleryLauncher.launch("image/*")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
-                            ) {
-                                Icon(Icons.Default.Photo, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("الاستوديو 🖼️", fontSize = 12.sp)
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = { showIdCardSourceSheet = false },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("إلغاء")
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedButton(
-                onClick = onBack,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color.Gray)
-            ) {
-                Text("إلغاء")
-            }
-
-            Button(
-                onClick = {
-                    // Quick validation checks
-                    if (fullName.isBlank()) nameError = true
-                    if (phone.length < 6) phoneError = true
-                    if (selectedMainCat.isEmpty()) mainCatError = true
-                    if (selectedMainCat.isNotEmpty() && selectedSubCat.isEmpty()) subCatError = true
-                    if (addressDetails.isBlank()) addressError = true
-                    if (districtArea.isBlank()) districtError = true
-                    if (avatarImageUri.isEmpty()) avatarError = true
-
-                    if (!nameError && !phoneError && !mainCatError && !subCatError && !addressError && !districtError && !avatarError) {
-                        // Submit request to pending_providers
-                        val request = PendingProvider(
-                            name = fullName,
+                    isSubmitting = true
+                    // Simulate uploading files delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        FirestoreSim.submitJoinRequest(
+                            name = name,
+                            title = title,
+                            bio = bio,
                             phone = phone,
-                            mainCategoryId = selectedMainCat,
-                            subCategoryId = selectedSubCat,
-                            address = addressDetails,
-                            district = districtArea,
-                            gpsCoordinates = gpsCoordinates.ifBlank { null },
-                            avatarUrl = if (avatarImageUri.isBlank()) "avatar_male_1" else avatarImageUri,
-                            idCardUrl = if (idCardImageUri.isBlank()) null else idCardImageUri
+                            region = region,
+                            selfie = if (selfieUri.isEmpty()) "selfie_default_sim.png" else selfieUri,
+                            idCard = if (idCardUri.isEmpty()) "id_default_sim.png" else idCardUri
                         )
-
-                        FirestoreSim.addPendingProvider(context, request)
-                        Toast.makeText(context, "تم إرسال طلب انضمامك بنجاح! الإدارة تراجع طلبك بمتوسط 10 دقائق.", Toast.LENGTH_LONG).show()
-                        onBack()
-                    } else {
-                        Toast.makeText(context, "يرجى تعبئة كافة الحقول الإجبارية وإصلاح الأخطاء الملونة بالأحمر", Toast.LENGTH_SHORT).show()
-                    }
+                        isSubmitting = false
+                        Toast.makeText(context, "تم إرسال طلبك بنجاح! شكراً لانضمامك وسيتم مراجعته من الإدارة.", Toast.LENGTH_LONG).show()
+                        onNavigateBack()
+                    }, 2000)
                 },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(bottom = 12.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                enabled = !isSubmitting
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("إرسال طلب الانضمام والتوثيق المعتمد 🚀", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+        }
+
+        // Expanded Live Camera simulator screen
+        if (showCameraSim) {
+            CameraSimulatorView(
+                mode = cameraMode,
+                onClose = { showCameraSim = false },
+                onCaptured = { capturedPath ->
+                    if (cameraMode == "selfie") {
+                        selfieUri = capturedPath
+                    } else {
+                        idCardUri = capturedPath
+                    }
+                    showCameraSim = false
+                    Toast.makeText(context, "تم التقاط الصورة بنجاح وتجهيز المستند!", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun DocumentPickerItem(
+    title: String,
+    description: String,
+    uri: String,
+    onPickLocal: () -> Unit,
+    onCaptureLive: () -> Unit
+) {
+    Column {
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+        Text(description, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Pick from library button
+            Button(
+                onClick = onPickLocal,
                 modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF374151))
+            ) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("من المعرض 🏞️", fontSize = 11.sp)
+            }
+
+            // Capture live direct button from phone camera
+            Button(
+                onClick = onCaptureLive,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("تقديم طلب الانضمام للخدمة", color = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("التقاط مباشر 📸", fontSize = 11.sp)
+            }
+        }
+
+        // Display status feedback
+        if (uri.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "مرفق جاهز: $uri (تم توثيقه بنجاح ✅)",
+                    fontSize = 11.sp,
+                    color = Color.Green
+                )
             }
         }
     }
 }
 
-private val SoftWhite = Color(0xFFC4C4C4)
+@Composable
+fun CameraSimulatorView(
+    mode: String,
+    onClose: () -> Unit,
+    onCaptured: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var isSnapping by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(enabled = false) {} // block click propagation
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (mode == "selfie") "كاميرا السيلفي الأمامية الذكية 🤳" else "مسح وقراءة بطاقة الهوية الوطنية 💳",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, null, tint = Color.White)
+                }
+            }
+
+            // Simulated live viewport viewfinder
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .padding(24.dp)
+                    .background(Color(0xFF1E1E24), RoundedCornerShape(24.dp))
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSnapping) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                } else {
+                    if (mode == "selfie") {
+                        // Selfie focus guidelines
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Face,
+                                contentDescription = null,
+                                modifier = Modifier.size(120.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "ضع وجهك داخل الدائرة المحددة للتثبيت والتصوير الخبير",
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    } else {
+                        // Passport / ID Scan guidelines
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .height(160.dp)
+                                .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.CreditCard,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(50.dp),
+                                    tint = Color.LightGray.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    "قم بمحاذاة البطاقة الشخصية داخل المستطيل",
+                                    color = Color.Gray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Trigger tools
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF111827))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = {
+                        isSnapping = true
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            isSnapping = false
+                            val randomId = (10000..99999).random()
+                            val prefix = if (mode == "selfie") "camera_selfie_" else "camera_scanned_id_"
+                            onCaptured("$prefix$randomId.jpg")
+                        }, 1200)
+                    },
+                    modifier = Modifier
+                        .size(68.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .padding(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "انقر لالتقاط وحفظ الصورة مشفوعة لملف التقييم الفوري",
+                    color = Color.LightGray,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}

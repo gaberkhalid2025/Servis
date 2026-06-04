@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="72dp"
-        android:height="72dp"
-        android:drawable="@drawable/ic_service_launcher_1780528316828"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background circle shadow -->
+    <path
+        android:pathData="M54,54m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0"
+        android:fillColor="#22000000" />
+    <!-- Wrench/Service Icon center -->
+    <path
+        android:pathData="M38,54 C38,45.16 45.16,38 54,38 C56.5,38 58.8,38.5 61,39.5 L55,45.5 L62.5,53 L68.5,47 C69.5,49.2 70,51.5 70,54 C70,62.84 62.84,70 54,70 C45.16,70 38,62.84 38,54 Z"
+        android:fillColor="#FF0088FF" />
+    <!-- Star center accent -->
+    <path
+        android:pathData="M54,48 L55.5,52 L60,52 L56.5,54.5 L58,58.5 L54,56 L50,58.5 L51.5,54.5 L48,52 L52.5,52 Z"
+        android:fillColor="#FFFFD700" />
+</vector>

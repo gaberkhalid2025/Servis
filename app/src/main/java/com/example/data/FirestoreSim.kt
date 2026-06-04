@@ -1,1050 +1,493 @@
 package com.example.data
 
 import android.content.Context
-import android.os.Environment
+import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.File
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
-/**
- * An advanced, high-fidelity simulated Firestore Real-Time Database.
- * This class emulates addSnapshotListener, offline persistence, and automatic syncing.
- * It is preloaded with beautiful Arabic service data in Yemen districts to ensure immediate visual polish.
- */
 object FirestoreSim {
-    private const val PREFS_NAME = "firestore_simulation_prefs"
+    private const val PREFS_NAME = "firestore_sim_prefs"
+    private var prefs: SharedPreferences? = null
 
-    // Configuration states
-    var isPersistenceEnabled = true
-
-    // Real-Time snapshot listeners dictionary
-    private val listeners = mutableMapOf<String, MutableList<() -> Unit>>()
-
-    // In-memory data states
-    private val _mainCategories = MutableStateFlow<List<MainCategory>>(emptyList())
-    val mainCategories: StateFlow<List<MainCategory>> = _mainCategories.asStateFlow()
-
-    private val _subCategories = MutableStateFlow<List<SubCategory>>(emptyList())
-    val subCategories: StateFlow<List<SubCategory>> = _subCategories.asStateFlow()
-
-    private val _serviceProviders = MutableStateFlow<List<ServiceProvider>>(emptyList())
-    val serviceProviders: StateFlow<List<ServiceProvider>> = _serviceProviders.asStateFlow()
-
-    private val _pendingProviders = MutableStateFlow<List<PendingProvider>>(emptyList())
-    val pendingProviders: StateFlow<List<PendingProvider>> = _pendingProviders.asStateFlow()
+    // State flows representing real-time listeners (Snapshot listeners)
+    private val _providers = MutableStateFlow<List<Provider>>(emptyList())
+    val providers = _providers.asStateFlow()
 
     private val _reviews = MutableStateFlow<List<Review>>(emptyList())
-    val reviews: StateFlow<List<Review>> = _reviews.asStateFlow()
+    val reviews = _reviews.asStateFlow()
 
-    private val _reports = MutableStateFlow<List<Report>>(emptyList())
-    val reports: StateFlow<List<Report>> = _reports.asStateFlow()
+    private val _chatRooms = MutableStateFlow<List<ChatRoom>>(emptyList())
+    val chatRooms = _chatRooms.asStateFlow()
 
-    private val _banners = MutableStateFlow<List<Banner>>(emptyList())
-    val banners: StateFlow<List<Banner>> = _banners.asStateFlow()
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages = _messages.asStateFlow()
 
-    private val _promotedAds = MutableStateFlow<List<PromotedAd>>(emptyList())
-    val promotedAds: StateFlow<List<PromotedAd>> = _promotedAds.asStateFlow()
+    private val _configs = MutableStateFlow(AppConfigs())
+    val configs = _configs.asStateFlow()
 
-    private val _cities = MutableStateFlow<List<City>>(emptyList())
-    val cities: StateFlow<List<City>> = _cities.asStateFlow()
+    private val _notificationTemplates = MutableStateFlow<List<NotificationTemplate>>(emptyList())
+    val notificationTemplates = _notificationTemplates.asStateFlow()
 
-    private val _fcmChannels = MutableStateFlow<List<FcmChannelState>>(emptyList())
-    val fcmChannels: StateFlow<List<FcmChannelState>> = _fcmChannels.asStateFlow()
+    private val _reportNotifications = MutableStateFlow<List<ReportNotification>>(emptyList())
+    val reportNotifications = _reportNotifications.asStateFlow()
 
-    private val _appColors = MutableStateFlow(AppColors())
-    val appColors: StateFlow<AppColors> = _appColors.asStateFlow()
+    private val _pendingProviders = MutableStateFlow<List<PendingProvider>>(emptyList())
+    val pendingProviders = _pendingProviders.asStateFlow()
 
-    private val _appConfigs = MutableStateFlow(AppConfigs())
-    val appConfigs: StateFlow<AppConfigs> = _appConfigs.asStateFlow()
+    // Logged in user info
+    // "guest" format is used if logged off
+    var currentUserId = "guest"
+    var currentUserName = "زائر كريم"
+    var currentUserPhone = ""
+    var currentUserAvatar = ""
 
-    private val _userLoyaltyPoints = MutableStateFlow(0)
-    val userLoyaltyPoints: StateFlow<Int> = _userLoyaltyPoints.asStateFlow()
+    fun init(context: Context) {
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        loadAll()
 
-    private val _moderators = MutableStateFlow<List<Moderator>>(emptyList())
-    val moderators: StateFlow<List<Moderator>> = _moderators.asStateFlow()
-
-    private val _favorites = MutableStateFlow<Set<String>>(emptySet())
-    val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
-
-    private val _contactHistory = MutableStateFlow<List<ContactLog>>(emptyList())
-    val contactHistory: StateFlow<List<ContactLog>> = _contactHistory.asStateFlow()
-
-    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
-
-    // Sync state visual notifications
-    private val _syncStatus = MutableStateFlow("متزامن بالكامل مع السحابة المركزية")
-    val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
-
-    fun initialize(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        
-        // Checks if populated before, otherwise load beautiful seed data
-        val hasData = prefs.getBoolean("has_initialized_data", false)
-        if (!hasData) {
-            seedInitialData()
-            saveToDisk(context)
-            prefs.edit().putBoolean("has_initialized_data", true).apply()
-        } else {
-            loadFromDisk(context)
+        if (_providers.value.isEmpty()) {
+            loadDefaultData()
         }
     }
 
-    private fun seedInitialData() {
-        // 1. Initial Main Categories
-        _mainCategories.value = listOf(
-            MainCategory("cat_1", "صيانة منزلية", "home", 1),
-            MainCategory("cat_2", "صحة ورعاية", "medical", 2),
-            MainCategory("cat_3", "تعليم وتدريب", "school", 3),
-            MainCategory("cat_4", "نقل وخدمات", "car", 4)
+    private fun loadAll() {
+        val pJson = prefs?.getString("providers", "[]") ?: "[]"
+        val rJson = prefs?.getString("reviews", "[]") ?: "[]"
+        val crJson = prefs?.getString("chatRooms", "[]") ?: "[]"
+        val mJson = prefs?.getString("messages", "[]") ?: "[]"
+        val cJson = prefs?.getString("configs", "") ?: ""
+        val ntJson = prefs?.getString("notificationTemplates", "[]") ?: "[]"
+        val repJson = prefs?.getString("reports", "[]") ?: "[]"
+        val pendJson = prefs?.getString("pending", "[]") ?: "[]"
+
+        val jsonObj = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+        try {
+            _providers.value = jsonObj.decodeFromString<List<Provider>>(pJson)
+            _reviews.value = jsonObj.decodeFromString<List<Review>>(rJson)
+            _chatRooms.value = jsonObj.decodeFromString<List<ChatRoom>>(crJson)
+            _messages.value = jsonObj.decodeFromString<List<ChatMessage>>(mJson)
+            _configs.value = if (cJson.isNotEmpty()) jsonObj.decodeFromString<AppConfigs>(cJson) else AppConfigs()
+            _notificationTemplates.value = jsonObj.decodeFromString<List<NotificationTemplate>>(ntJson)
+            _reportNotifications.value = jsonObj.decodeFromString<List<ReportNotification>>(repJson)
+            _pendingProviders.value = jsonObj.decodeFromString<List<PendingProvider>>(pendJson)
+        } catch (e: Exception) {
+            Log.e("FirestoreSim", "Failed to decode firestore simulation data, resetting to defaults", e)
+            loadDefaultData()
+        }
+    }
+
+    private fun saveAll() {
+        val json = Json { prettyPrint = false }
+        prefs?.edit()?.apply {
+            putString("providers", json.encodeToString(_providers.value))
+            putString("reviews", json.encodeToString(_reviews.value))
+            putString("chatRooms", json.encodeToString(_chatRooms.value))
+            putString("messages", json.encodeToString(_messages.value))
+            putString("configs", json.encodeToString(_configs.value))
+            putString("notificationTemplates", json.encodeToString(_notificationTemplates.value))
+            putString("reports", json.encodeToString(_reportNotifications.value))
+            putString("pending", json.encodeToString(_pendingProviders.value))
+            apply()
+        }
+    }
+
+    private fun loadDefaultData() {
+        // Initial providers from major Yemeni regions
+        _providers.value = listOf(
+            Provider(
+                id = "p1",
+                name = "المهندس عادل الوادعي",
+                title = "خبير شبكات وتمديدات كهربائية متكاملة ⚡",
+                bio = "خبرة أكثر من ١٢ عاماً في تركيب شبكات الطاقة الشمسية وتوصيل كابلات المنازل الحديثة بأحدث المقاييس في صنعاء.",
+                phone = "771122334",
+                mainCategoryId = "electricity",
+                subCategoryId = "solar",
+                region = "صنعاء - شارع حدة",
+                isVerified = true,
+                isPinned = true,
+                isRecommended = true,
+                averageRating = 4.8,
+                reviewCount = 2,
+                lat = 15.3121,
+                lng = 44.1952
+            ),
+            Provider(
+                id = "p2",
+                name = "الفني محمد الصبري",
+                title = "سباك صحي وخبير تمديد شبكات مياه 🚰",
+                bio = "متخصص في تأسيس وتشطيب فلل وعمارات سكنية، وصيانة الفلاتر والمضخمات في العاصمة صنعاء الكبرى.",
+                phone = "775566778",
+                mainCategoryId = "plumbing",
+                subCategoryId = "pipes",
+                region = "صنعاء - باب اليمن",
+                isVerified = true,
+                isPinned = false,
+                isRecommended = true,
+                averageRating = 4.5,
+                reviewCount = 1,
+                lat = 15.3524,
+                lng = 44.2078
+            ),
+            Provider(
+                id = "p3",
+                name = "المبرمج وضاح العولقي",
+                title = "مطور تطبيقات أندرويد وتصميم المتاجر الإلكترونية 📱",
+                bio = "مطور برمجيات ذو كفاءة عالية، أقوم بتحويل أفكار المشاريع والخدمات المحلية إلى برامج سلسة تدعم اللغة العربية في عدن.",
+                phone = "733445566",
+                mainCategoryId = "tech",
+                subCategoryId = "android",
+                region = "عدن - كريتر",
+                isVerified = false,
+                isPinned = false,
+                isRecommended = true,
+                averageRating = 5.0,
+                reviewCount = 1,
+                lat = 12.7852,
+                lng = 45.0354
+            ),
+            Provider(
+                id = "p4",
+                name = "المعلم صالح العصيمي",
+                title = "خبير نجارة وديكورات خشبية راقية 🪵",
+                bio = "تصميم صناعة غرف النوم التركية، أبواب المساجد المزخرفة، والأسقف المعلقة بدقة متناهية تحت طابع تعزي أصيل.",
+                phone = "711229988",
+                mainCategoryId = "carpentry",
+                subCategoryId = "decor",
+                region = "تعز - شارع جمال",
+                isVerified = false,
+                isPinned = true,
+                isRecommended = false,
+                averageRating = 4.0,
+                reviewCount = 1,
+                lat = 13.5824,
+                lng = 44.0125
+            ),
+            Provider(
+                id = "p5",
+                name = "الميكانيكي أمين السويدي",
+                title = "خبير هيدروليك وصيانة محركات الديزل والبترول 🚗",
+                bio = "تشخيص أعطال كمبيوتر السيارات بالسونار، وتوضيب المحركات وناقل السرعات الأتوماتيكي بمهارة وعناية فائقة في الحديدة.",
+                phone = "771234567",
+                mainCategoryId = "mechanics",
+                subCategoryId = "diesel",
+                region = "الحديدة - شارع صنعاء",
+                isVerified = false,
+                isPinned = false,
+                isRecommended = false,
+                averageRating = 0.0,
+                reviewCount = 0,
+                lat = 14.7951,
+                lng = 42.9542
+            )
         )
 
-        // 2. Initial Sub-categories
-        _subCategories.value = listOf(
-            SubCategory("sub_1_1", "cat_1", "كهربائي", 1),
-            SubCategory("sub_1_2", "cat_1", "سباك", 2),
-            SubCategory("sub_1_3", "cat_1", "فني تكييف", 3),
-            SubCategory("sub_1_4", "cat_1", "نجار غرف وصالونات", 4),
-
-            SubCategory("sub_2_1", "cat_2", "طبيب منزلي", 1),
-            SubCategory("sub_2_2", "cat_2", "ممرض طوارئ", 2),
-            SubCategory("sub_2_3", "cat_2", "معالج طبيعي ومساج", 3),
-
-            SubCategory("sub_3_1", "cat_3", "مدرس رياضيات وفيزياء", 1),
-            SubCategory("sub_3_2", "cat_3", "مدرس خصوصي أطفال", 2),
-            SubCategory("sub_3_3", "cat_3", "مدرب لغات أجنبية", 3),
-
-            SubCategory("sub_4_1", "cat_4", "سائق تكسي وتوصيل مشاوير", 1),
-            SubCategory("sub_4_2", "cat_4", "دينا نقل عفش وأثاث", 2),
-            SubCategory("sub_4_3", "cat_4", "مهندس ميكانيك متنقل", 3)
-        )
-
-        // 3. Preloaded Service Providers
-        _serviceProviders.value = listOf(
-            ServiceProvider("p_1", "ماهر محمد طاهر ", "777644670", "cat_1", "sub_1_1", "شارع حدة - صنعاء", "مديرية السبعين", "15.3184, 44.1950", "avatar_male_1", null, isPinned = true, isRecommended = true, isSubscribed = true, ratingSum = 25f, ratingCount = 5),
-            ServiceProvider("p_2", "أحمد علي الريمي", "771122334", "cat_1", "sub_1_2", "جولة الرويشان - صنعاء", "مديرية السبعين", "15.3214, 44.2014", "avatar_male_2", null, isPinned = false, isRecommended = true, isSubscribed = false, ratingSum = 18f, ratingCount = 4),
-            ServiceProvider("p_3", "د. سارة فضل عبدالله", "733445566", "cat_2", "sub_2_1", "شارع التحرير - تعز", "مديرية المظفر", "13.5794, 44.0150", "avatar_female_1", null, isPinned = true, isRecommended = true, isSubscribed = true, ratingSum = 30f, ratingCount = 6),
-            ServiceProvider("p_4", "صالح علوي الكلدي", "711556677", "cat_4", "sub_4_2", "منطقة المنصورة - عدن", "حي ريمي", "12.8256, 44.9912", "avatar_male_3", null, isPinned = true, isRecommended = false, isSubscribed = false, ratingSum = 15f, ratingCount = 3),
-            ServiceProvider("p_5", "م. وليد كمال الخياط", "770777111", "cat_3", "sub_3_1", "حي الديس - المكلا", "شعبة المهاجرين", "14.5422, 49.1244", "avatar_male_4", null, isPinned = false, isRecommended = false, isSubscribed = true, ratingSum = 10f, ratingCount = 2)
-        )
-
-        // 4. Preloaded Pending Providers (Join Requests)
-        _pendingProviders.value = listOf(
-            PendingProvider("pending_1", "حسين مبارك الحضرمي", "735889900", "cat_1", "sub_1_3", "خور مكسر - عدن", "حي السلام", "12.8122, 45.0211", "avatar_male_5", null),
-            PendingProvider("pending_2", "منى سعيد الأشول", "777881122", "cat_3", "sub_3_2", "منطقة الأصبحي - صنعاء", "مديرية السبعين", "15.2894, 44.2150", "avatar_female_2", null)
-        )
-
-        // 5. Preloaded Reviews
+        // Prepopulate reviews
         _reviews.value = listOf(
-            Review("rev_1", "p_1", "محمد يحيى", 5f, "ممتاز جداً وأمين وصيانته سريعة ودقيقة انصح به!"),
-            Review("rev_2", "p_1", "ياسر القدسي", 5f, "شغل راقي جدا وملتزم بالمواعيد ورخيص"),
-            Review("rev_3", "p_3", "أميرة هائل", 5f, "طبيبة ممتازة جدا تهتم بالمرضى في منازلهم وتعامله راقي"),
-            Review("rev_4", "p_5", "وليد الجبلي", 5f, "شرح سلس جدا ومبسط واستفدنا جزيلا منه")
+            Review("r1", "p1", "أبو بكر الحمادي", 5, "عمل هندسي متقن جداً، قام بتركيب المنظومة الشمسية بمهنية فائقة ووقت وجيز ونعم الأخلاق.", 1717416000000),
+            Review("r2", "p1", "خالد يحيى", 5, "خبير ومستشار مميز في حل مشاكل ماس الكهرباء، شكرا جز يلا.", 1717436000000),
+            Review("r3", "p2", "فؤاد الغباري", 4, "شغله نظيف وسريع في صيانة تصريف المياه بالحمامات والمجاري.", 1717456000000),
+            Review("r4", "p3", "م. سارة الصنعاني", 5, "طور لنا تطبيق المتجر باحترافية، سريع الاستجابة ومرن بالتعامل.", 1717476000000),
+            Review("r5", "p4", "ياسر القدسي", 4, "شغله بالخشب الصولد قوي ومتين صمم لنا دولاب ممتاز يستحق الشكر.", 1717496000000)
         )
 
-        // 6. Preloaded reports
-        _reports.value = listOf(
-            Report("rep_1", "p_2", "خالد الوصابي", "تأخر عن الموعد المحدد لأكثر من ساعتين دون إشعار", System.currentTimeMillis())
+        // Prepopulate templates
+        _notificationTemplates.value = listOf(
+            NotificationTemplate("welcome", "رسالة الترحيب التلقائية", "أهلاً بك في تطبيق دليلك للخدمات 👋", "نشكر انضمامك إلينا! دليلك يوصلك بأفضل الحرفيين والفنيين المعتمدين في اليمن بضغطة زر.", true, 1),
+            NotificationTemplate("appointment", "تذكير المواعيد والتنسيق", "تأكيد واستذكار الموعد المقترح 📆", "عزيزنا العميل، هذا تذكير بموعد الخدمة المتفق عليه مع الفني. يرجى المتابعة لضمان سلامة التنفيذ.", true, 60),
+            NotificationTemplate("bill", "تنبيه الفواتير والدفع الإلكتروني", "تنبيه سداد الفاتورة 💳", "شريكنا العزيز، صدرت فاتورة الخدمة المنجزة. يمكنك الاطلاع على التفاصيل وتأكيد الدفع بأمان.", false, 10)
         )
 
-        // 7. Cities
-        _cities.value = listOf(
-            City("c_1", "صنعاء", listOf("مديرية السبعين", "مديرية التحرير", "مديرية الصافية", "مديرية شعوب")),
-            City("c_2", "عدن", listOf("حي المنصورة", "خور مكسر", "حي المعلا", "كريتر")),
-            City("c_3", "تعز", listOf("مديرية المظفر", "مديرية القاهرة", "صالة")),
-            City("c_4", "حضرموت", listOf("المكلا - الديس", "الشحر", "سيئون"))
+        // Prepopulate report notifications
+        _reportNotifications.value = listOf(
+            ReportNotification("rep1", "محاولة دخول غير مصرحة للوحة التحكم", "تم رصد محاولة وصول من جهاز غير مسجل في القائمة الموثوقة (Whitelist). رقم الـ IP: 192.168.1.105", "UNAUTHORIZED_LOGIN", System.currentTimeMillis() - 600000 * 5),
+            ReportNotification("rep2", "بلاغ أمني عن إساءة استخدام", "قام المستخدم فؤاد بالتبليغ عن حساب الموفر 'أمين السويدي' بدعوى طلب أسعار مبالغ فيها وعدم الحضور بالميعاد.", "COMPLAINT", System.currentTimeMillis() - 3600000),
+            ReportNotification("rep3", "طلب اشتراك ممول / شهري", "الموفر 'المهندس عادل الوادعي' قدم طلباً لترقية الخدمة الممولة للحصول على شارة التوصية والظهور المثبت في الصدارة.", "SUBSCRIPTION_REQUEST", System.currentTimeMillis() - 1200000)
         )
 
-        // 8. Banners
-        _banners.value = listOf(
-            Banner("b_1", "دليلك الشامل لجميع المهن", "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة", "banner_illustration_1", 30, "", "Medium", "Service"),
-            Banner("b_2", "عروض الصيف وتخفيضات المكيفات", "خصومات حتى 25% مع مزودي خدمة صيانة التكييف المميزين", "banner_illustration_2", 15, "", "Large", "External")
+        _configs.value = AppConfigs()
+
+        saveAll()
+    }
+
+    // Helper functions
+    fun addReview(providerId: String, reviewerName: String, rating: Int, comment: String) {
+        val newReview = Review(
+            id = "rev_${System.currentTimeMillis()}",
+            providerId = providerId,
+            reviewerName = reviewerName,
+            rating = rating,
+            comment = comment,
+            timestamp = System.currentTimeMillis()
+        )
+        val updatedReviews = _reviews.value + newReview
+        _reviews.value = updatedReviews
+
+        // Re-calculate average rating for provider
+        val currentProviderReviews = updatedReviews.filter { it.providerId == providerId }
+        val avg = currentProviderReviews.map { it.rating }.average()
+        val count = currentProviderReviews.size
+
+        _providers.value = _providers.value.map {
+            if (it.id == providerId) {
+                it.copy(averageRating = (Math.round(avg * 10.0) / 10.0), reviewCount = count)
+            } else {
+                it
+            }
+        }
+
+        saveAll()
+    }
+
+    fun submitJoinRequest(name: String, title: String, bio: String, phone: String, region: String, selfie: String, idCard: String) {
+        val newPending = PendingProvider(
+            id = "pending_${System.currentTimeMillis()}",
+            name = name,
+            title = title,
+            bio = bio,
+            phone = phone,
+            region = region,
+            selfieUri = selfie,
+            idCardUri = idCard,
+            timestamp = System.currentTimeMillis()
+        )
+        _pendingProviders.value = _pendingProviders.value + newPending
+
+        // Add real-time notification log to admin panel about the registry
+        addAdminReport(
+            title = "طلب انضمام فني جديد للخدمة 🛠️",
+            content = "قدم الفني '$name' طلباً للانضمام إلى دليل مقدمي الخدمات المعتمدين في بوابتك بصورة سيلفي وبطاقة هوية مرفقة قيد المراجعة.",
+            type = "SUBSCRIPTION_REQUEST"
+        )
+        saveAll()
+    }
+
+    fun approvePendingProvider(pendingId: String, mainCat: String, subCat: String) {
+        val pending = _pendingProviders.value.find { it.id == pendingId } ?: return
+        val newProvider = Provider(
+            id = "prov_${System.currentTimeMillis()}",
+            name = pending.name,
+            title = pending.title,
+            bio = pending.bio,
+            phone = pending.phone,
+            mainCategoryId = mainCat,
+            subCategoryId = subCat,
+            region = pending.region,
+            selfieUri = pending.selfieUri,
+            idCardUri = pending.idCardUri,
+            isVerified = true,
+            lat = 15.3 + (Math.random() - 0.5) * 0.2,
+            lng = 44.2 + (Math.random() - 0.5) * 0.2
+        )
+        _providers.value = _providers.value + newProvider
+        _pendingProviders.value = _pendingProviders.value.filter { it.id != pendingId }
+
+        saveAll()
+    }
+
+    fun rejectPendingProvider(pendingId: String) {
+        _pendingProviders.value = _pendingProviders.value.filter { it.id != pendingId }
+        saveAll()
+    }
+
+    // Toggle admin permissions
+    fun toggleProviderVerification(id: String) {
+        _providers.value = _providers.value.map {
+            if (it.id == id) it.copy(isVerified = !it.isVerified) else it
+        }
+        saveAll()
+    }
+
+    fun toggleProviderPinned(id: String) {
+        _providers.value = _providers.value.map {
+            if (it.id == id) it.copy(isPinned = !it.isPinned) else it
+        }
+        saveAll()
+    }
+
+    fun toggleProviderRecommended(id: String) {
+        _providers.value = _providers.value.map {
+            if (it.id == id) it.copy(isRecommended = !it.isRecommended) else it
+        }
+        saveAll()
+    }
+
+    fun setProviderBlocked(id: String, blocked: Boolean) {
+        _providers.value = _providers.value.map {
+            if (it.id == id) it.copy(isBlocked = blocked) else it
+        }
+        saveAll()
+    }
+
+    // Direct configuration edits
+    fun updateAppConfigs(newConfigs: AppConfigs) {
+        _configs.value = newConfigs
+        saveAll()
+    }
+
+    // Add alert logs for admin panel
+    fun addAdminReport(title: String, content: String, type: String) {
+        val newReport = ReportNotification(
+            id = "rep_${System.currentTimeMillis()}",
+            title = title,
+            content = content,
+            type = type,
+            timestamp = System.currentTimeMillis()
+        )
+        _reportNotifications.value = listOf(newReport) + _reportNotifications.value
+        saveAll()
+    }
+
+    fun markReportFileReviewed(id: String) {
+        _reportNotifications.value = _reportNotifications.value.map {
+            if (it.id == id) it.copy(isReviewed = true) else it
+        }
+        saveAll()
+    }
+
+    fun deleteAdminReport(id: String) {
+        _reportNotifications.value = _reportNotifications.value.filter { it.id != id }
+        saveAll()
+    }
+
+    // Real-time Chat functions
+    fun sendMessage(chatRoomId: String, text: String, context: Context, imageUri: String? = null) {
+        val roomIndex = _chatRooms.value.indexOfFirst { it.id == chatRoomId }
+        if (roomIndex == -1) return
+        val room = _chatRooms.value[roomIndex]
+
+        val senderNameValue = if (currentUserId == "guest") "زائر كريم" else currentUserName
+
+        val message = ChatMessage(
+            id = "msg_${System.currentTimeMillis()}",
+            chatRoomId = chatRoomId,
+            senderId = currentUserId,
+            senderName = senderNameValue,
+            content = text,
+            timestamp = System.currentTimeMillis(),
+            imageAttachedUri = imageUri
         )
 
-        // 9. Promoted ads
-        _promotedAds.value = listOf(
-            PromotedAd("ad_1", "p_1", "Text", "الكهربائي المعتمد ماهر طاهر", "توصيل وصيانة وتأسيس شبكات المنازل والفلل بأسعار منافسة وجودة عالية وضمانة!", 10, 250.0)
-        )
-
-        // 10. FCM Channels
-        _fcmChannels.value = listOf(
-            FcmChannelState("fcm_1", "طلبات انضمام المهن", true),
-            FcmChannelState("fcm_2", "التقارير والبلاغات الجديدة", true),
-            FcmChannelState("fcm_3", "التعليقات والتقييمات", true)
-        )
-
-        _appColors.value = AppColors("Cosmic Slate", "Bright White")
-        _appConfigs.value = AppConfigs()
-
-        // 11. Initial Moderators Seeding
-        _moderators.value = listOf(
-            Moderator("mod_1", "صالح المشرف الأول", "salih2026", "pass123"),
-            Moderator("mod_2", "سارة مشرفة السبعين", "sara2026", "sara777")
-        )
-
-        // 12. Initial Favorites Seeding
-        _favorites.value = setOf("p_1", "p_3")
-
-        // 13. Initial Contact History Seeding
-        _contactHistory.value = listOf(
-            ContactLog("cl_1", "p_1", System.currentTimeMillis() - 3600000 * 2, "Call"),
-            ContactLog("cl_2", "p_3", System.currentTimeMillis() - 3600000 * 24, "WhatsApp")
-        )
-    }
-
-    // Snapshot Listening implementation
-    fun addSnapshotListener(collection: String, onUpdate: () -> Unit): Subscription {
-        val list = listeners.getOrPut(collection) { mutableListOf() }
-        list.add(onUpdate)
-        return Subscription(collection, onUpdate)
-    }
-
-    class Subscription(val collection: String, val callback: () -> Unit) {
-        fun remove() {
-            listeners[collection]?.remove(callback)
-        }
-    }
-
-    private fun triggerUpdate(collection: String) {
-        _syncStatus.value = "جاري الحفظ والتزامن الفوري..."
-        listeners[collection]?.forEach { it() }
-        // Simple artificial network simulation delay
-        _syncStatus.value = "متزامن بالكامل مع السحابة المركزية (حفظ محلي فوري)"
-    }
-
-    // Disk caching / offline simulation
-    private fun saveToDisk(context: Context) {
-        if (!isPersistenceEnabled) return
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val editor = prefs.edit()
-
-        try {
-            // Save settings statically
-            editor.putString("app_name", _appConfigs.value.appName)
-            editor.putString("support_email", _appConfigs.value.supportEmail)
-            editor.putString("support_phone", _appConfigs.value.supportPhone)
-            editor.putString("support_whatsapp", _appConfigs.value.supportWhatsApp)
-            editor.putString("footer_promo", _appConfigs.value.footerPromoText)
-            editor.putString("welcome_msg", _appConfigs.value.welcomeMessage)
-            editor.putString("admin_password", _appConfigs.value.adminPassword)
-            editor.putBoolean("maintenance_active", _appConfigs.value.isMaintenanceActive)
-            editor.putFloat("assistant_size", _appConfigs.value.smartAssistantSize)
-            editor.putFloat("assistant_opacity", _appConfigs.value.assistantOpacity)
-            editor.putFloat("assistant_offset_x", _appConfigs.value.assistantOffsetX)
-            editor.putFloat("assistant_offset_y", _appConfigs.value.assistantOffsetY)
-            editor.putString("assistant_color_hex", _appConfigs.value.assistantColorHex)
-            editor.putBoolean("show_floating_contact", _appConfigs.value.showFloatingContact)
-            editor.putFloat("floating_contact_size", _appConfigs.value.floatingContactSize)
-            editor.putFloat("floating_contact_opacity", _appConfigs.value.floatingContactOpacity)
-            editor.putFloat("floating_contact_offset_x", _appConfigs.value.floatingContactOffsetX)
-            editor.putFloat("floating_contact_offset_y", _appConfigs.value.floatingContactOffsetY)
-            editor.putString("floating_contact_color_hex", _appConfigs.value.floatingContactColorHex)
-            editor.putBoolean("show_footer", _appConfigs.value.showPromoFooter)
-            editor.putFloat("category_icon_size", _appConfigs.value.categoryIconSize)
-
-            // New Ad and Welcome customization configs
-            editor.putString("ad_text_title", _appConfigs.value.adTextTitle)
-            editor.putString("ad_text_description", _appConfigs.value.adTextDescription)
-            editor.putString("ad_source_type", _appConfigs.value.adSourceType)
-            editor.putString("ad_image_path", _appConfigs.value.adImagePath)
-            editor.putInt("ad_show_duration_days", _appConfigs.value.adShowDurationDays)
-            editor.putBoolean("ad_is_visible", _appConfigs.value.adIsVisible)
-            editor.putLong("ad_start_time_millis", _appConfigs.value.adStartTimeMillis)
-            editor.putString("welcome_source_type", _appConfigs.value.welcomeSourceType)
-            editor.putString("welcome_image_path", _appConfigs.value.welcomeImagePath)
-            editor.putFloat("welcome_font_size", _appConfigs.value.welcomeFontSize)
-
-            // Save Colors
-            editor.putString("theme_name", _appColors.value.themeName)
-            editor.putString("text_color_name", _appColors.value.textColorName)
-
-            // Points
-            editor.putInt("loyalty_points", _userLoyaltyPoints.value)
-
-            // Save User Dashboard customizations
-            editor.putBoolean("show_dashboard_favs", _appConfigs.value.showDashboardFavorites)
-            editor.putBoolean("show_dashboard_history", _appConfigs.value.showDashboardCallHistory)
-            editor.putBoolean("dashboard_favs_first", _appConfigs.value.dashboardFavoritesFirst)
-            editor.putString("dashboard_custom_msg", _appConfigs.value.dashboardCustomMessage)
-
-            // Dynamic serialization for lists (simple CSV-like serialization to ensure zero dependency bugs)
-            editor.putString("main_categories_serial", serializeMainCategories(_mainCategories.value))
-            editor.putString("sub_categories_serial", serializeSubCategories(_subCategories.value))
-            editor.putString("service_providers_serial", serializeServiceProviders(_serviceProviders.value))
-            editor.putString("pending_providers_serial", serializePendingProviders(_pendingProviders.value))
-            editor.putString("reviews_serial", serializeReviews(_reviews.value))
-            editor.putString("reports_serial", serializeReports(_reports.value))
-            editor.putString("cities_serial", serializeCities(_cities.value))
-            editor.putString("banners_serial", serializeBanners(_banners.value))
-            editor.putString("promoted_ads_serial", serializePromotedAds(_promotedAds.value))
-            editor.putString("fcm_channels_serial", serializeFcmChannels(_fcmChannels.value))
-            editor.putString("favorites_serial", serializeFavorites(_favorites.value))
-            editor.putString("contact_history_serial", serializeContactHistory(_contactHistory.value))
-            editor.putString("moderators_serial", serializeModerators(_moderators.value))
-            editor.putString("chat_messages_serial", serializeChatMessages(_chatMessages.value))
-
-            editor.apply()
-        } catch (e: Exception) {
-            Log.e("FirestoreSim", "Error saving data", e)
-        }
-    }
-
-    private fun loadFromDisk(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        try {
-            _appConfigs.value = AppConfigs(
-                appName = prefs.getString("app_name", "دليلك لكل الخدمات") ?: "دليلك لكل الخدمات",
-                supportEmail = prefs.getString("support_email", "support@services-guide.example") ?: "support@services-guide.example",
-                supportPhone = prefs.getString("support_phone", "777644670") ?: "777644670",
-                supportWhatsApp = prefs.getString("support_whatsapp", "777644670") ?: "777644670",
-                footerPromoText = prefs.getString("footer_promo", "MAW 777644670") ?: "MAW 777644670",
-                welcomeMessage = prefs.getString("welcome_msg", "مرحباً بك في دليلك لكل الخدمات الفوري!") ?: "مرحباً بك في دليلك لكل الخدمات الفوري!",
-                adminPassword = prefs.getString("admin_password", "maher736462") ?: "maher736462",
-                isMaintenanceActive = prefs.getBoolean("maintenance_active", false),
-                smartAssistantSize = prefs.getFloat("assistant_size", 56f),
-                assistantOpacity = prefs.getFloat("assistant_opacity", 1f),
-                assistantOffsetX = prefs.getFloat("assistant_offset_x", 0f),
-                assistantOffsetY = prefs.getFloat("assistant_offset_y", 0f),
-                assistantColorHex = prefs.getString("assistant_color_hex", "#FFD700") ?: "#FFD700",
-                showFloatingContact = prefs.getBoolean("show_floating_contact", true),
-                floatingContactSize = prefs.getFloat("floating_contact_size", 56f),
-                floatingContactOpacity = prefs.getFloat("floating_contact_opacity", 1f),
-                floatingContactOffsetX = prefs.getFloat("floating_contact_offset_x", 0f),
-                floatingContactOffsetY = prefs.getFloat("floating_contact_offset_y", 0f),
-                floatingContactColorHex = prefs.getString("floating_contact_color_hex", "#25D366") ?: "#25D366",
-                showPromoFooter = prefs.getBoolean("show_footer", true),
-                showDashboardFavorites = prefs.getBoolean("show_dashboard_favs", true),
-                showDashboardCallHistory = prefs.getBoolean("show_dashboard_history", true),
-                dashboardFavoritesFirst = prefs.getBoolean("dashboard_favs_first", true),
-                dashboardCustomMessage = prefs.getString("dashboard_custom_msg", "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!") ?: "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!",
-                categoryIconSize = prefs.getFloat("category_icon_size", 32f),
-                adTextTitle = prefs.getString("ad_text_title", "دليلك الشامل لجميع المهن") ?: "دليلك الشامل لجميع المهن",
-                adTextDescription = prefs.getString("ad_text_description", "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة") ?: "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة",
-                adSourceType = prefs.getString("ad_source_type", "text") ?: "text",
-                adImagePath = prefs.getString("ad_image_path", "") ?: "",
-                adShowDurationDays = prefs.getInt("ad_show_duration_days", 30),
-                adIsVisible = prefs.getBoolean("ad_is_visible", true),
-                adStartTimeMillis = prefs.getLong("ad_start_time_millis", 0L),
-                welcomeSourceType = prefs.getString("welcome_source_type", "text") ?: "text",
-                welcomeImagePath = prefs.getString("welcome_image_path", "") ?: "",
-                welcomeFontSize = prefs.getFloat("welcome_font_size", 11f)
-            )
-
-            _appColors.value = AppColors(
-                themeName = prefs.getString("theme_name", "Cosmic Slate") ?: "Cosmic Slate",
-                textColorName = prefs.getString("text_color_name", "Bright White") ?: "Bright White"
-            )
-
-            _userLoyaltyPoints.value = prefs.getInt("loyalty_points", 0)
-
-            // Load arrays
-            prefs.getString("main_categories_serial", null)?.let {
-                _mainCategories.value = deserializeMainCategories(it)
-            }
-            prefs.getString("sub_categories_serial", null)?.let {
-                _subCategories.value = deserializeSubCategories(it)
-            }
-            prefs.getString("service_providers_serial", null)?.let {
-                _serviceProviders.value = deserializeServiceProviders(it)
-            }
-            prefs.getString("pending_providers_serial", null)?.let {
-                _pendingProviders.value = deserializePendingProviders(it)
-            }
-            prefs.getString("reviews_serial", null)?.let {
-                _reviews.value = deserializeReviews(it)
-            }
-            prefs.getString("reports_serial", null)?.let {
-                _reports.value = deserializeReports(it)
-            }
-            prefs.getString("cities_serial", null)?.let {
-                _cities.value = deserializeCities(it)
-            }
-            prefs.getString("banners_serial", null)?.let {
-                _banners.value = deserializeBanners(it)
-            }
-            prefs.getString("promoted_ads_serial", null)?.let {
-                _promotedAds.value = deserializePromotedAds(it)
-            }
-            prefs.getString("fcm_channels_serial", null)?.let {
-                _fcmChannels.value = deserializeFcmChannels(it)
-            }
-            prefs.getString("favorites_serial", null)?.let {
-                _favorites.value = deserializeFavorites(it)
-            }
-            prefs.getString("contact_history_serial", null)?.let {
-                _contactHistory.value = deserializeContactHistory(it)
-            }
-            prefs.getString("moderators_serial", null)?.let {
-                _moderators.value = deserializeModerators(it)
-            }
-            prefs.getString("chat_messages_serial", null)?.let {
-                _chatMessages.value = deserializeChatMessages(it)
-            }
-        } catch (e: Exception) {
-            Log.e("FirestoreSim", "Error loading data from SharedPreferences", e)
-            seedInitialData()
-        }
-    }
-
-    // ==========================================
-    // MUTATION FUNCTIONS WITH INSTANT SYNC
-    // ==========================================
-
-    fun updateColors(context: Context, theme: String, textColor: String) {
-        _appColors.value = AppColors(theme, textColor)
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    fun updateConfigs(context: Context, configs: AppConfigs) {
-        _appConfigs.value = configs
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    fun toggleFavorite(context: Context, providerId: String) {
-        val current = _favorites.value.toMutableSet()
-        if (current.contains(providerId)) {
-            current.remove(providerId)
-        } else {
-            current.add(providerId)
-        }
-        _favorites.value = current
-        saveToDisk(context)
-        triggerUpdate("favorites")
-    }
-
-    fun addContactLog(context: Context, providerId: String, mode: String) {
-        val current = _contactHistory.value.toMutableList()
-        current.add(0, ContactLog("cl_${System.currentTimeMillis()}", providerId, System.currentTimeMillis(), mode))
-        _contactHistory.value = current.take(50)
-        saveToDisk(context)
-        triggerUpdate("contact_history")
-    }
-
-    fun clearContactHistory(context: Context) {
-        _contactHistory.value = emptyList()
-        saveToDisk(context)
-        triggerUpdate("contact_history")
-    }
-
-    fun saveModerator(context: Context, mod: Moderator) {
-        val current = _moderators.value.toMutableList()
-        val index = current.indexOfFirst { it.id == mod.id }
-        if (index >= 0) {
-            current[index] = mod
-        } else {
-            current.add(mod.copy(id = "mod_${System.currentTimeMillis()}"))
-        }
-        _moderators.value = current
-        saveToDisk(context)
-        triggerUpdate("moderators")
-    }
-
-    fun deleteModerator(context: Context, modId: String) {
-        _moderators.value = _moderators.value.filter { it.id != modId }
-        saveToDisk(context)
-        triggerUpdate("moderators")
-    }
-
-    fun addLoyaltyPoints(context: Context, amt: Int) {
-        _userLoyaltyPoints.value += amt
-        saveToDisk(context)
-    }
-
-    fun toggleFcmChannel(context: Context, id: String, enable: Boolean) {
-        _fcmChannels.value = _fcmChannels.value.map {
-            if (it.id == id) it.copy(isEnabled = enable) else it
-        }
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    // Main Categories Mutations
-    fun saveMainCategory(context: Context, cat: MainCategory) {
-        val current = _mainCategories.value.toMutableList()
-        val index = current.indexOfFirst { it.id == cat.id }
-        if (index >= 0) {
-            current[index] = cat
-        } else {
-            current.add(cat.copy(id = "cat_${System.currentTimeMillis()}"))
-        }
-        _mainCategories.value = current
-        saveToDisk(context)
-        triggerUpdate("categories")
-    }
-
-    fun deleteMainCategory(context: Context, catId: String) {
-        _mainCategories.value = _mainCategories.value.filter { it.id != catId }
-        _subCategories.value = _subCategories.value.filter { it.parentId != catId }
-        saveToDisk(context)
-        triggerUpdate("categories")
-    }
-
-    // Sub-Categories Mutations
-    fun saveSubCategory(context: Context, sub: SubCategory) {
-        val current = _subCategories.value.toMutableList()
-        val index = current.indexOfFirst { it.id == sub.id }
-        if (index >= 0) {
-            current[index] = sub
-        } else {
-            current.add(sub.copy(id = "sub_${System.currentTimeMillis()}"))
-        }
-        _subCategories.value = current
-        saveToDisk(context)
-        triggerUpdate("categories")
-    }
-
-    fun deleteSubCategory(context: Context, subId: String) {
-        _subCategories.value = _subCategories.value.filter { it.id != subId }
-        saveToDisk(context)
-        triggerUpdate("categories")
-    }
-
-    // Manage Service Providers
-    fun addProviderInstantly(context: Context, p: ServiceProvider) {
-        val updated = _serviceProviders.value.toMutableList()
-        updated.add(p.copy(id = "p_${System.currentTimeMillis()}"))
-        _serviceProviders.value = updated
-        saveToDisk(context)
-        triggerUpdate("service_providers")
-    }
-
-    fun updateProvider(context: Context, p: ServiceProvider) {
-        _serviceProviders.value = _serviceProviders.value.map {
-            if (it.id == p.id) p else it
-        }
-        saveToDisk(context)
-        triggerUpdate("service_providers")
-    }
-
-    fun deleteProvider(context: Context, pId: String) {
-        _serviceProviders.value = _serviceProviders.value.filter { it.id != pId }
-        saveToDisk(context)
-        triggerUpdate("service_providers")
-    }
-
-    // Pending Providers (Enrollment Requests)
-    fun addPendingProvider(context: Context, req: PendingProvider) {
-        val current = _pendingProviders.value.toMutableList()
-        current.add(req.copy(id = "pending_${System.currentTimeMillis()}"))
-        _pendingProviders.value = current
-        saveToDisk(context)
-        triggerUpdate("pending_providers")
-    }
-
-    fun updatePendingStatus(context: Context, reqId: String, status: String, reason: String? = null) {
-        val requests = _pendingProviders.value
-        val request = requests.find { it.id == reqId } ?: return
-
-        if (status == "approved") {
-            // Transfer to service_providers
-            val newProvider = ServiceProvider(
-                id = "p_${System.currentTimeMillis()}",
-                name = request.name,
-                phone = request.phone,
-                mainCategoryId = request.mainCategoryId,
-                subCategoryId = request.subCategoryId,
-                address = request.address,
-                district = request.district,
-                gpsCoordinates = request.gpsCoordinates,
-                avatarUrl = request.avatarUrl,
-                idCardUrl = request.idCardUrl
-            )
-            val updatedProviders = _serviceProviders.value.toMutableList()
-            updatedProviders.add(newProvider)
-            _serviceProviders.value = updatedProviders
-            triggerUpdate("service_providers")
-
-            // Remove from pending
-            _pendingProviders.value = requests.filter { it.id != reqId }
-        } else if (status == "rejected") {
-            // Mark status as rejected
-            _pendingProviders.value = requests.map {
-                if (it.id == reqId) it.copy(status = "rejected", rejectionReason = reason) else it
-            }
-        }
-        saveToDisk(context)
-        triggerUpdate("pending_providers")
-    }
-
-    fun deletePendingRequest(context: Context, reqId: String) {
-        _pendingProviders.value = _pendingProviders.value.filter { it.id != reqId }
-        saveToDisk(context)
-        triggerUpdate("pending_providers")
-    }
-
-    // Cities Controls
-    fun addCity(context: Context, name: String, districts: List<String>, country: String = "اليمن") {
-        val current = _cities.value.toMutableList()
-        current.add(City("c_${System.currentTimeMillis()}", name, districts, country))
-        _cities.value = current
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    fun editCity(context: Context, cityId: String, name: String, districts: List<String>, country: String = "اليمن") {
-        _cities.value = _cities.value.map {
-            if (it.id == cityId) it.copy(name = name, districts = districts, country = country) else it
-        }
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    fun deleteCity(context: Context, cityId: String) {
-        _cities.value = _cities.value.filter { it.id != cityId }
-        saveToDisk(context)
-        triggerUpdate("admins")
-    }
-
-    // Reviews Mutation
-    fun addReview(context: Context, rev: Review) {
-        val current = _reviews.value.toMutableList()
-        current.add(rev.copy(id = "rev_${System.currentTimeMillis()}"))
-        _reviews.value = current
-
-        // Update provider ranking cache
-        val sum = current.filter { it.providerId == rev.providerId }.sumOf { it.rating.toDouble() }.toFloat()
-        val count = current.filter { it.providerId == rev.providerId }.size
-
-        _serviceProviders.value = _serviceProviders.value.map {
-            if (it.id == rev.providerId) {
-                it.copy(ratingSum = sum, ratingCount = count)
-            } else it
-        }
-
-        saveToDisk(context)
-        triggerUpdate("reviews")
-        triggerUpdate("service_providers")
-    }
-
-    // Reports Mutation
-    fun addReport(context: Context, rep: Report) {
-        val current = _reports.value.toMutableList()
-        current.add(rep.copy(id = "rep_${System.currentTimeMillis()}"))
-        _reports.value = current
-        saveToDisk(context)
-        triggerUpdate("reports")
-    }
-
-    fun deleteReport(context: Context, reportId: String) {
-        _reports.value = _reports.value.filter { it.id != reportId }
-        saveToDisk(context)
-        triggerUpdate("reports")
-    }
-
-    // Banners Mutations
-    fun saveBanner(context: Context, ban: Banner) {
-        val current = _banners.value.toMutableList()
-        val index = current.indexOfFirst { it.id == ban.id }
-        if (index >= 0) {
-            current[index] = ban
-        } else {
-            current.add(ban.copy(id = "b_${System.currentTimeMillis()}"))
-        }
-        _banners.value = current
-        saveToDisk(context)
-        triggerUpdate("banners")
-    }
-
-    fun deleteBanner(context: Context, bannerId: String) {
-        _banners.value = _banners.value.filter { it.id != bannerId }
-        saveToDisk(context)
-        triggerUpdate("banners")
-    }
-
-    // Promoted Ads Mutations
-    fun savePromotedAd(context: Context, ad: PromotedAd) {
-        val current = _promotedAds.value.toMutableList()
-        val index = current.indexOfFirst { it.id == ad.id }
-        if (index >= 0) {
-            current[index] = ad
-        } else {
-            current.add(ad.copy(id = "ad_${System.currentTimeMillis()}"))
-        }
-        _promotedAds.value = current
-        saveToDisk(context)
-        triggerUpdate("banners")
-    }
-
-    fun deletePromotedAd(context: Context, adId: String) {
-        _promotedAds.value = _promotedAds.value.filter { it.id != adId }
-        saveToDisk(context)
-        triggerUpdate("banners")
-    }
-
-    // ==========================================
-    // BACKUP AND RESTORE UTILITIES
-    // ==========================================
-
-    fun generateBackupString(): String {
-        val builder = java.lang.StringBuilder()
-        builder.append("=== SYSTEM BACKUP - ${_appConfigs.value.appName} ===\n")
-        builder.append("THEME|${_appColors.value.themeName}|${_appColors.value.textColorName}\n")
-        builder.append("CONFIG|${_appConfigs.value.appName}|${_appConfigs.value.supportEmail}|${_appConfigs.value.supportPhone}|${_appConfigs.value.supportWhatsApp}|${_appConfigs.value.footerPromoText}|${_appConfigs.value.welcomeMessage}|${_appConfigs.value.adminPassword}|${_appConfigs.value.isMaintenanceActive}\n")
+        _messages.value = _messages.value + message
         
-        _mainCategories.value.forEach {
-            builder.append("MAIN_CAT|${it.id}|${it.name}|${it.iconCode}|${it.order}\n")
+        // Update room log
+        _chatRooms.value = _chatRooms.value.map {
+            if (it.id == chatRoomId) {
+                it.copy(lastMessage = text, lastTimestamp = System.currentTimeMillis())
+            } else {
+                it
+            }
         }
-        _subCategories.value.forEach {
-            builder.append("SUB_CAT|${it.id}|${it.parentId}|${it.name}|${it.order}\n")
-        }
-        _serviceProviders.value.forEach {
-            builder.append("PROVIDER|${it.id}|${it.name}|${it.phone}|${it.mainCategoryId}|${it.subCategoryId}|${it.address}|${it.district}|${it.gpsCoordinates ?: ""}|${it.avatarUrl}|${it.isPinned}|${it.isRecommended}|${it.isSubscribed}|${it.ratingSum}|${it.ratingCount}\n")
-        }
-        _reviews.value.forEach {
-            builder.append("REVIEW|${it.id}|${it.providerId}|${it.userName}|${it.rating}|${it.comment}\n")
-        }
-        _reports.value.forEach {
-            builder.append("REPORT|${it.id}|${it.providerId}|${it.userName}|${it.comment}\n")
-        }
-        _cities.value.forEach {
-            builder.append("CITY|${it.id}|${it.name}|${it.districts.joinToString(",")}|${it.country}\n")
-        }
-        return builder.toString()
-    }
+        saveAll()
 
-    fun restoreFromBackupString(context: Context, backupData: String): Boolean {
-        if (!backupData.startsWith("=== SYSTEM BACKUP")) return false
-        try {
-            val lines = backupData.split("\n")
-            val newMainCats = mutableListOf<MainCategory>()
-            val newSubCats = mutableListOf<SubCategory>()
-            val newProviders = mutableListOf<ServiceProvider>()
-            val newReviews = mutableListOf<Review>()
-            val newReports = mutableListOf<Report>()
-            val newCities = mutableListOf<City>()
+        // Admin notification triggers
+        addAdminReport(
+            title = "رسالة دردشة حية نشطة 💬",
+            content = "أرسل العميل '$senderNameValue' رسالة إلى مقدم الخدمة '${room.providerName}': \"$text\"",
+            type = "COMPLAINT"
+        )
 
-            for (line in lines) {
-                if (line.isBlank() || line.startsWith("===")) continue
-                val parts = line.split("|")
-                if (parts.size < 2) continue
-                when (parts[0]) {
-                    "THEME" -> {
-                        _appColors.value = AppColors(parts[1], parts.getOrNull(2) ?: "Bright White")
-                    }
-                    "CONFIG" -> {
-                        if (parts.size >= 9) {
-                            _appConfigs.value = AppConfigs(
-                                appName = parts[1],
-                                supportEmail = parts[2],
-                                supportPhone = parts[3],
-                                supportWhatsApp = parts[4],
-                                footerPromoText = parts[5],
-                                welcomeMessage = parts[6],
-                                adminPassword = parts[7],
-                                isMaintenanceActive = parts[8].toBoolean()
-                            )
-                        }
-                    }
-                    "MAIN_CAT" -> {
-                        if (parts.size >= 5) {
-                            newMainCats.add(MainCategory(parts[1], parts[2], parts[3], parts[4].toIntOrNull() ?: 1))
-                        }
-                    }
-                    "SUB_CAT" -> {
-                        if (parts.size >= 5) {
-                            newSubCats.add(SubCategory(parts[1], parts[2], parts[3], parts[4].toIntOrNull() ?: 1))
-                        }
-                    }
-                    "PROVIDER" -> {
-                        if (parts.size >= 15) {
-                            newProviders.add(ServiceProvider(
-                                id = parts[1], name = parts[2], phone = parts[3],
-                                mainCategoryId = parts[4], subCategoryId = parts[5],
-                                address = parts[6], district = parts[7],
-                                gpsCoordinates = parts[8].ifBlank { null },
-                                avatarUrl = parts[9],
-                                isPinned = parts[10].toBoolean(),
-                                isRecommended = parts[11].toBoolean(),
-                                isSubscribed = parts[12].toBoolean(),
-                                ratingSum = parts[13].toFloatOrNull() ?: 0f,
-                                ratingCount = parts[14].toIntOrNull() ?: 0
-                            ))
-                        }
-                    }
-                    "REVIEW" -> {
-                        if (parts.size >= 6) {
-                            newReviews.add(Review(parts[1], parts[2], parts[3], parts[4].toFloatOrNull() ?: 5f, parts[5]))
-                        }
-                    }
-                    "REPORT" -> {
-                        if (parts.size >= 5) {
-                            newReports.add(Report(parts[1], parts[2], parts[3], parts[4]))
-                        }
-                    }
-                    "CITY" -> {
-                        if (parts.size >= 5) {
-                            val districts = parts[3].split(",").filter { it.isNotBlank() }
-                            newCities.add(City(parts[1], parts[2], districts, parts[4]))
-                        } else if (parts.size >= 4) {
-                            val districts = parts[3].split(",").filter { it.isNotBlank() }
-                            newCities.add(City(parts[1], parts[2], districts, "اليمن"))
-                        }
-                    }
-                }
+        // Provider automated reply simulation to make it feel extremely alive
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Check if provider is blocked, if so, no reply
+            val provider = _providers.value.find { it.id == room.providerId }
+            val globalServiceBlocked = _providers.value.all { it.isBlocked }
+
+            if (provider?.isBlocked == true || globalServiceBlocked) {
+                val blockedMsg = ChatMessage(
+                    id = "msg_autorep_${System.currentTimeMillis()}",
+                    chatRoomId = chatRoomId,
+                    senderId = room.providerId,
+                    senderName = "دليل الخدمات التلقائي 🤖",
+                    content = "عذراً، فني الخدمة هذا أو هذا القسم متوقف حالياً بأمر من الإدارة العامة بالبوابة 🚫",
+                    timestamp = System.currentTimeMillis()
+                )
+                _messages.value = _messages.value + blockedMsg
+                saveAll()
+                return@postDelayed
             }
 
-            if (newMainCats.isNotEmpty()) _mainCategories.value = newMainCats
-            if (newSubCats.isNotEmpty()) _subCategories.value = newSubCats
-            if (newProviders.isNotEmpty()) _serviceProviders.value = newProviders
-            _reviews.value = newReviews
-            _reports.value = newReports
-            if (newCities.isNotEmpty()) _cities.value = newCities
+            // Generate intelligent replies from providers depending on their scope
+            val replyText = when (provider?.mainCategoryId) {
+                "electricity" -> "حياك الله يا غالي. أنا متاح الآن وجاهز لمعاينة العطل في ممددات الشبكة. بخصوص أسعار الطاقة الشمسية تختلف بنوع اللوح والبطارية الكوري أو الهندسي. أين موقعك وسأتواصل معك؟ 🔌🛠️"
+                "plumbing" -> "السلام عليكم ورحمة الله، تمديد وتصريف وتركيب مضخات المياه جاهز لفحصها فوراً يا طيب. هل هي حالة طارئة من تسرب مائي؟"
+                "tech" -> "مرحباً بك! يسعدني جداً العمل على تطبيقك أو متجرك الإلكتروني. نعم نحن نقوم بالدعم وتصميم قواعد البيانات مع ربطها بالخوادم المحلية والـ Firestore. دعنا نحدد المتطلبات للتكلفة الكلية."
+                "carpentry" -> "يا هلا بك، غرف وتفصيل وتصليح أبواب ومطابخ حسب رغبتك ومقاس منزلك بكل دقة ممكنة إن شاء الله."
+                "mechanics" -> "أهلاً وسهلاً بك يا غالي. صيانة ميكانيك وتوضيب وتشخيص بالكمبيوتر متاح بصبر وعناية في ورشتنا المتكاملة، تفضل بزيارتنا وسنقوم بالفحص."
+                else -> "حياك الله أخي وتفضل بكيفية مساعدتك وسأتجاوب معك فوراً بإذن الله 🇾🇪"
+            }
 
-            saveToDisk(context)
-            triggerUpdate("categories")
-            triggerUpdate("service_providers")
-            triggerUpdate("admins")
-            triggerUpdate("reports")
-            triggerUpdate("reviews")
-            return true
-        } catch (e: Exception) {
-            Log.e("FirestoreSim", "Backup restoration error", e)
-            return false
-        }
-    }
+            val replyMsg = ChatMessage(
+                id = "msg_autorep_${System.currentTimeMillis()}",
+                chatRoomId = chatRoomId,
+                senderId = room.providerId,
+                senderName = room.providerName,
+                content = replyText,
+                timestamp = System.currentTimeMillis()
+            )
+            _messages.value = _messages.value + replyMsg
 
-    fun backupToSDCard(context: Context): String? {
-        return try {
-            val backupText = generateBackupString()
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) downloadsDir.mkdirs()
-            val file = File(downloadsDir, "dalil_services_backup.txt")
-            file.writeText(backupText)
-            file.absolutePath
-        } catch (e: Exception) {
-            Log.e("FirestoreSim", "SD Card backup failed", e)
-            null
-        }
-    }
-
-    fun restoreFromSDCard(context: Context): Boolean {
-        return try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val file = File(downloadsDir, "dalil_services_backup.txt")
-            if (file.exists()) {
-                restoreFromBackupString(context, file.readText())
-            } else false
-        } catch (e: Exception) {
-            Log.e("FirestoreSim", "SD Card restore failed", e)
-            false
-        }
-    }
-
-    // ==========================================
-    // MANUAL ARRAY SERIALIZERS
-    // ==========================================
-
-    private fun serializeMainCategories(list: List<MainCategory>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.iconCode},${it.order}" }
-    }
-    private fun deserializeMainCategories(s: String): List<MainCategory> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 4) MainCategory(p[0], p[1], p[2], p[3].toIntOrNull() ?: 1) else null
-        }
-    }
-
-    private fun serializeSubCategories(list: List<SubCategory>): String {
-        return list.joinToString(";") { "${it.id},${it.parentId},${it.name},${it.order}" }
-    }
-    private fun deserializeSubCategories(s: String): List<SubCategory> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 4) SubCategory(p[0], p[1], p[2], p[3].toIntOrNull() ?: 1) else null
-        }
-    }
-
-    private fun serializeServiceProviders(list: List<ServiceProvider>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.phone},${it.mainCategoryId},${it.subCategoryId},${it.address},${it.district},${it.gpsCoordinates ?: ""},${it.avatarUrl},${it.idCardUrl ?: ""},${it.isPinned},${it.isRecommended},${it.isSubscribed},${it.ratingSum},${it.ratingCount}" }
-    }
-    private fun deserializeServiceProviders(s: String): List<ServiceProvider> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 15) {
-                ServiceProvider(
-                    id = p[0],
-                    name = p[1],
-                    phone = p[2],
-                    mainCategoryId = p[3],
-                    subCategoryId = p[4],
-                    address = p[5],
-                    district = p[6],
-                    gpsCoordinates = p[7].ifBlank { null },
-                    avatarUrl = p[8],
-                    idCardUrl = p[9].ifBlank { null },
-                    isPinned = p[10].toBoolean(),
-                    isRecommended = p[11].toBoolean(),
-                    isSubscribed = p[12].toBoolean(),
-                    ratingSum = p[13].toFloatOrNull() ?: 0f,
-                    ratingCount = p[14].toIntOrNull() ?: 0
-                )
-            } else null
-        }
-    }
-
-    private fun serializePendingProviders(list: List<PendingProvider>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.phone},${it.mainCategoryId},${it.subCategoryId},${it.address},${it.district},${it.gpsCoordinates ?: ""},${it.avatarUrl},${it.idCardUrl ?: ""},${it.status},${it.rejectionReason ?: ""},${it.timestamp}" }
-    }
-    private fun deserializePendingProviders(s: String): List<PendingProvider> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 13) {
-                PendingProvider(
-                    id = p[0],
-                    name = p[1],
-                    phone = p[2],
-                    mainCategoryId = p[3],
-                    subCategoryId = p[4],
-                    address = p[5],
-                    district = p[6],
-                    gpsCoordinates = p[7].ifBlank { null },
-                    avatarUrl = p[8],
-                    idCardUrl = p[9].ifBlank { null },
-                    status = p[10],
-                    rejectionReason = p[11].ifBlank { null },
-                    timestamp = p[12].toLongOrNull() ?: System.currentTimeMillis()
-                )
-            } else null
-        }
-    }
-
-    private fun serializeReviews(list: List<Review>): String {
-        return list.joinToString(";") { "${it.id},${it.providerId},${it.userName},${it.rating},${it.comment},${it.timestamp}" }
-    }
-    private fun deserializeReviews(s: String): List<Review> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 6) Review(p[0], p[1], p[2], p[3].toFloatOrNull() ?: 5f, p[4], p[5].toLongOrNull() ?: System.currentTimeMillis()) else null
-        }
-    }
-
-    private fun serializeReports(list: List<Report>): String {
-        return list.joinToString(";") { "${it.id},${it.providerId},${it.userName},${it.comment},${it.timestamp}" }
-    }
-    private fun deserializeReports(s: String): List<Report> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 5) Report(p[0], p[1], p[2], p[3], p[4].toLongOrNull() ?: System.currentTimeMillis()) else null
-        }
-    }
-
-    private fun serializeCities(list: List<City>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.districts.joinToString("|")},${it.country}" }
-    }
-    private fun deserializeCities(s: String): List<City> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 4) {
-                City(p[0], p[1], p[2].split("|").filter { d -> d.isNotBlank() }, p[3])
-            } else if (p.size >= 3) {
-                City(p[0], p[1], p[2].split("|").filter { d -> d.isNotBlank() }, "اليمن")
-            } else null
-        }
-    }
-
-    private fun serializeBanners(list: List<Banner>): String {
-        return list.joinToString(";") { "${it.id},${it.title},${it.description},${it.imageUrl},${it.durationDays},${it.redirectUrl},${it.bannerSize},${it.bannerType},${it.timestamp}" }
-    }
-    private fun deserializeBanners(s: String): List<Banner> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 9) Banner(p[0], p[1], p[2], p[3], p[4].toIntOrNull() ?: 7, p[5], p[6], p[7], p[8].toLongOrNull() ?: System.currentTimeMillis()) else null
-        }
-    }
-
-    private fun serializePromotedAds(list: List<PromotedAd>): String {
-        return list.joinToString(";") { "${it.id},${it.providerId ?: ""},${it.type},${it.title},${it.content},${it.durationDays},${it.budget},${it.timestamp}" }
-    }
-    private fun deserializePromotedAds(s: String): List<PromotedAd> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 8) PromotedAd(p[0], p[1].ifBlank { null }, p[2], p[3], p[4], p[5].toIntOrNull() ?: 5, p[6].toDoubleOrNull() ?: 100.0, p[7].toLongOrNull() ?: System.currentTimeMillis()) else null
-        }
-    }
-
-    private fun serializeFcmChannels(list: List<FcmChannelState>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.isEnabled}" }
-    }
-    private fun deserializeFcmChannels(s: String): List<FcmChannelState> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 3) FcmChannelState(p[0], p[1], p[2].toBoolean()) else null
-        }
-    }
-
-    private val _fcmChannelsStateSerialList = mutableListOf<String>() // dummy holder
-
-    private fun serializeModerators(list: List<Moderator>): String {
-        return list.joinToString(";") { "${it.id},${it.name},${it.username},${it.password}" }
-    }
-    private fun deserializeModerators(s: String): List<Moderator> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 4) Moderator(p[0], p[1], p[2], p[3]) else null
-        }
-    }
-
-    private fun serializeFavorites(set: Set<String>): String {
-        return set.joinToString(",")
-    }
-    private fun deserializeFavorites(s: String): Set<String> {
-        if (s.isBlank()) return emptySet()
-        return s.split(",").filter { it.isNotBlank() }.toSet()
-    }
-
-    private fun serializeContactHistory(list: List<ContactLog>): String {
-        return list.joinToString(";") { "${it.id},${it.providerId},${it.timestamp},${it.mode}" }
-    }
-    private fun deserializeContactHistory(s: String): List<ContactLog> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 4) ContactLog(p[0], p[1], p[2].toLongOrNull() ?: System.currentTimeMillis(), p[3]) else null
-        }
-    }
-
-    fun sendChatMessage(context: Context, msg: ChatMessage) {
-        val current = _chatMessages.value.toMutableList()
-        current.add(msg)
-        _chatMessages.value = current
-        saveToDisk(context)
-        triggerUpdate("chat_messages")
-    }
-
-    private fun serializeChatMessages(list: List<ChatMessage>): String {
-        return list.joinToString(";") {
-            val encodedMsg = java.net.URLEncoder.encode(it.message, "UTF-8")
-            "${it.id},${it.providerId},${it.sender},$encodedMsg,${it.timestamp}"
-        }
-    }
-    private fun deserializeChatMessages(s: String): List<ChatMessage> {
-        if (s.isBlank()) return emptyList()
-        return s.split(";").mapNotNull {
-            val p = it.split(",")
-            if (p.size >= 5) {
-                val decodedMsg = try {
-                    java.net.URLDecoder.decode(p[3], "UTF-8")
-                } catch (e: Exception) {
-                    p[3]
+            _chatRooms.value = _chatRooms.value.map {
+                if (it.id == chatRoomId) {
+                    it.copy(lastMessage = replyText, lastTimestamp = System.currentTimeMillis())
+                } else {
+                    it
                 }
-                ChatMessage(p[0], p[1], p[2], decodedMsg, p[4].toLongOrNull() ?: System.currentTimeMillis())
-            } else null
+            }
+            saveAll()
+
+            // Trigger simulated push notification (FCM) to client
+            if (_configs.value.fcmEnabled) {
+                val toastMsg = "🔔 تلقيت رسالة من الموفر ${room.providerName}: $replyText"
+                Toast.makeText(context, toastMsg, Toast.LENGTH_LONG).show()
+            }
+        }, 3000)
+    }
+
+    fun openOrCreateChatRoom(providerId: String, providerName: String): String {
+        val existing = _chatRooms.value.find {
+            it.userId == currentUserId && it.providerId == providerId
         }
+        if (existing != null) return existing.id
+
+        val newId = "room_${System.currentTimeMillis()}"
+        val newRoom = ChatRoom(
+            id = newId,
+            userId = currentUserId,
+            userName = if (currentUserId == "guest") "زائر كريم" else currentUserName,
+            providerId = providerId,
+            providerName = providerName,
+            lastMessage = "بدء دردشة حية فورية جديدة 💬",
+            lastTimestamp = System.currentTimeMillis()
+        )
+        _chatRooms.value = _chatRooms.value + newRoom
+        saveAll()
+        return newId
+    }
+
+    // Toggle individual templates
+    fun toggleTemplateEnabled(id: String) {
+        _notificationTemplates.value = _notificationTemplates.value.map {
+            if (it.id == id) it.copy(isEnabled = !it.isEnabled) else it
+        }
+        saveAll()
+    }
+
+    fun updateTemplate(id: String, title: String, body: String, delay: Int) {
+        _notificationTemplates.value = _notificationTemplates.value.map {
+            if (it.id == id) it.copy(title = title, body = body, sendDelayMinutes = delay) else it
+        }
+        saveAll()
+    }
+
+    // Reset database to initial pristine state
+    fun resetDatabase() {
+        loadDefaultData()
     }
 }
