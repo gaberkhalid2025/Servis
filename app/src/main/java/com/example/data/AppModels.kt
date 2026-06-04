@@ -89,7 +89,17 @@ data class AppConfigs(
     val showDashboardCallHistory: Boolean = true,
     val dashboardFavoritesFirst: Boolean = true,
     val dashboardCustomMessage: String = "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!",
-    val categoryIconSize: Float = 32f
+    val categoryIconSize: Float = 32f,
+    val adTextTitle: String = "دليلك الشامل لجميع المهن",
+    val adTextDescription: String = "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة",
+    val adSourceType: String = "text", // "text", "local", "web_url"
+    val adImagePath: String = "",
+    val adShowDurationDays: Int = 30,
+    val adIsVisible: Boolean = true,
+    val adStartTimeMillis: Long = 0L,
+    val welcomeSourceType: String = "text", // "text", "image"
+    val welcomeImagePath: String = "",
+    val welcomeFontSize: Float = 11f
 )
 
 @Immutable

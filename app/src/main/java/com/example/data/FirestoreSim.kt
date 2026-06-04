@@ -244,6 +244,18 @@ object FirestoreSim {
             editor.putBoolean("show_footer", _appConfigs.value.showPromoFooter)
             editor.putFloat("category_icon_size", _appConfigs.value.categoryIconSize)
 
+            // New Ad and Welcome customization configs
+            editor.putString("ad_text_title", _appConfigs.value.adTextTitle)
+            editor.putString("ad_text_description", _appConfigs.value.adTextDescription)
+            editor.putString("ad_source_type", _appConfigs.value.adSourceType)
+            editor.putString("ad_image_path", _appConfigs.value.adImagePath)
+            editor.putInt("ad_show_duration_days", _appConfigs.value.adShowDurationDays)
+            editor.putBoolean("ad_is_visible", _appConfigs.value.adIsVisible)
+            editor.putLong("ad_start_time_millis", _appConfigs.value.adStartTimeMillis)
+            editor.putString("welcome_source_type", _appConfigs.value.welcomeSourceType)
+            editor.putString("welcome_image_path", _appConfigs.value.welcomeImagePath)
+            editor.putFloat("welcome_font_size", _appConfigs.value.welcomeFontSize)
+
             // Save Colors
             editor.putString("theme_name", _appColors.value.themeName)
             editor.putString("text_color_name", _appColors.value.textColorName)
@@ -308,7 +320,17 @@ object FirestoreSim {
                 showDashboardCallHistory = prefs.getBoolean("show_dashboard_history", true),
                 dashboardFavoritesFirst = prefs.getBoolean("dashboard_favs_first", true),
                 dashboardCustomMessage = prefs.getString("dashboard_custom_msg", "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!") ?: "مرحباً بك في لوحة تحكمك المفضلة وسجل التواصل!",
-                categoryIconSize = prefs.getFloat("category_icon_size", 32f)
+                categoryIconSize = prefs.getFloat("category_icon_size", 32f),
+                adTextTitle = prefs.getString("ad_text_title", "دليلك الشامل لجميع المهن") ?: "دليلك الشامل لجميع المهن",
+                adTextDescription = prefs.getString("ad_text_description", "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة") ?: "ابحث عن أفضل الفنيين المعتمدين في منطقتك بضغطة زر واحدة",
+                adSourceType = prefs.getString("ad_source_type", "text") ?: "text",
+                adImagePath = prefs.getString("ad_image_path", "") ?: "",
+                adShowDurationDays = prefs.getInt("ad_show_duration_days", 30),
+                adIsVisible = prefs.getBoolean("ad_is_visible", true),
+                adStartTimeMillis = prefs.getLong("ad_start_time_millis", 0L),
+                welcomeSourceType = prefs.getString("welcome_source_type", "text") ?: "text",
+                welcomeImagePath = prefs.getString("welcome_image_path", "") ?: "",
+                welcomeFontSize = prefs.getFloat("welcome_font_size", 11f)
             )
 
             _appColors.value = AppColors(

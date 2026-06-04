@@ -30,6 +30,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.*
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.getSelectedTextColor
+import coil.compose.rememberAsyncImagePainter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1148,6 +1149,14 @@ fun UserDashboardSettingsTab(
 
         Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
 
+        AdAndWelcomeCustomizationCard(
+            configs = configs,
+            onSave = onSave,
+            writeTextColor = writeTextColor
+        )
+
+        Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
+
         // --- Standard Admin access to management of countries, governorates, and cities (as requested!) ---
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24)),
@@ -1728,6 +1737,219 @@ fun getIconForCode(code: String): androidx.compose.ui.graphics.vector.ImageVecto
         "build" -> Icons.Default.Build
         "design_services" -> Icons.Default.DesignServices
         else -> Icons.Default.HomeWork
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdAndWelcomeCustomizationCard(
+    configs: AppConfigs,
+    onSave: (AppConfigs) -> Unit,
+    writeTextColor: Color
+) {
+    var adTitle by remember { mutableStateOf(configs.adTextTitle) }
+    var adDesc by remember { mutableStateOf(configs.adTextDescription) }
+    var adType by remember { mutableStateOf(configs.adSourceType) } // "text", "local", "web_url"
+    var adPath by remember { mutableStateOf(configs.adImagePath) }
+    var adDuration by remember { mutableStateOf(configs.adShowDurationDays.toString()) }
+    var adVisible by remember { mutableStateOf(configs.adIsVisible) }
+
+    var welcomeMsg by remember { mutableStateOf(configs.welcomeMessage) }
+    var welcomeType by remember { mutableStateOf(configs.welcomeSourceType) } // "text", "image"
+    var welcomePath by remember { mutableStateOf(configs.welcomeImagePath) }
+    var welcomeSize by remember { mutableStateOf(configs.welcomeFontSize) }
+
+    val context = LocalContext.current
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("تخصيص الإعلان المعتمد والترحيب المميز 📢", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+            Text("إدارة ظهور الإعلان والترحيب بصورة أو بنص والتحكم الكامل بمواقيتها وأحجامها.", fontSize = 11.sp, color = Color.LightGray)
+
+            Divider(color = Color.DarkGray)
+
+            // --- Section 1: الاعلان المعتمد ---
+            Text("📍 إعدادات الإعلان المعتمد الفوري", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("إظهار الإعلان المعتمد:", fontSize = 11.sp, color = Color.White)
+                Switch(
+                    checked = adVisible,
+                    onCheckedChange = { adVisible = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                )
+            }
+
+            Text("نوع محتوى الإعلان:", fontSize = 11.sp, color = Color.LightGray)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("text" to "نص فقط 📝", "local" to "صورة محلية 📁", "web_url" to "رابط صورة ويب 🌐").forEach { (type, label) ->
+                    FilterChip(
+                        selected = adType == type,
+                        onClick = { adType = type },
+                        label = { Text(label, fontSize = 10.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+
+            if (adType == "text") {
+                OutlinedTextField(
+                    value = adTitle,
+                    onValueChange = { adTitle = it },
+                    label = { Text("عنوان الإعلان") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+                OutlinedTextField(
+                    value = adDesc,
+                    onValueChange = { adDesc = it },
+                    label = { Text("وصف وتفاصيل الإعلان") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+            } else if (adType == "local") {
+                OutlinedTextField(
+                    value = adPath,
+                    onValueChange = { adPath = it },
+                    label = { Text("مسار الصورة بذاكرة الهاتف / بطاقة الذاكرة") },
+                    placeholder = { Text("مثال: /storage/emulated/0/Download/ad.png") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            adPath = "/storage/emulated/0/Pictures/ad_image.jpg"
+                            Toast.makeText(context, "تم محاكاة إدخال مسار ذاكرة الهاتف الداخلية ✓", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Text("محاكاة الذاكرة 📁", fontSize = 9.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            adPath = "/mnt/sdcard/ad_image.png"
+                            Toast.makeText(context, "تم محاكاة إدخال مسار بطاقة الذاكرة الخارجية SD ✓", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Text("محاكاة بطاقة SD 💾", fontSize = 9.sp, color = Color.White)
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = adPath,
+                    onValueChange = { adPath = it },
+                    label = { Text("رابط صورة الويب (https/http)") },
+                    placeholder = { Text("مثال: https://img.example.com/banner.jpg") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+            }
+
+            OutlinedTextField(
+                value = adDuration,
+                onValueChange = { adDuration = it.filter { char -> char.isDigit() } },
+                label = { Text("مدة ظهور الإعلان بالأيام") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+            )
+
+            Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 4.dp))
+
+            // -- Section 2: رسالة الترحيب --
+            Text("👋 إعدادات رسالة الترحيب المنبثقة", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+
+            Text("نوع محتوى الترحيب:", fontSize = 11.sp, color = Color.LightGray)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("text" to "نص ترحيبي 📝", "image" to "صورة ترحيبية 🖼️").forEach { (type, label) ->
+                    FilterChip(
+                        selected = welcomeType == type,
+                        onClick = { welcomeType = type },
+                        label = { Text(label, fontSize = 10.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+
+            if (welcomeType == "text") {
+                OutlinedTextField(
+                    value = welcomeMsg,
+                    onValueChange = { welcomeMsg = it },
+                    label = { Text("جسم نص رسالة الترحيب") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+            } else {
+                OutlinedTextField(
+                    value = welcomePath,
+                    onValueChange = { welcomePath = it },
+                    label = { Text("رابط أو مسار صورة الترحيب") },
+                    placeholder = { Text("مثال: https://images.com/welcome_banner.png") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor)
+                )
+                Button(
+                    onClick = {
+                        welcomePath = "https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&w=600&q=80"
+                        Toast.makeText(context, "تم إمداد رابط ترحيبي عالي الدقة ✓", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                ) {
+                    Text("رابط ويب ترحيبي تجريبي 🌐", fontSize = 10.sp, color = Color.White)
+                }
+            }
+
+            // Adjust Font Size
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("حجم خط الترحيب: ${welcomeSize.toInt()} sp", fontSize = 11.sp, color = Color.LightGray)
+                Slider(
+                    value = welcomeSize,
+                    onValueChange = { welcomeSize = it },
+                    valueRange = 8f..28f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+
+            Button(
+                onClick = {
+                    val durationVal = adDuration.toIntOrNull() ?: 30
+                    val updated = configs.copy(
+                        adTextTitle = adTitle,
+                        adTextDescription = adDesc,
+                        adSourceType = adType,
+                        adImagePath = adPath,
+                        adShowDurationDays = durationVal,
+                        adIsVisible = adVisible,
+                        adStartTimeMillis = if (configs.adStartTimeMillis == 0L) System.currentTimeMillis() else configs.adStartTimeMillis,
+                        welcomeMessage = welcomeMsg,
+                        welcomeSourceType = welcomeType,
+                        welcomeImagePath = welcomePath,
+                        welcomeFontSize = welcomeSize
+                    )
+                    onSave(updated)
+                    Toast.makeText(context, "تم حفظ إعدادات الإشهار والترحيب وتوزيعها فورياً! 🚀", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("حفظ التخصيص والخيارات المعتمدة 💾", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

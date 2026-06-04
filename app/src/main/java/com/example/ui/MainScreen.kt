@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.*
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.getSelectedTextColor
+import coil.compose.rememberAsyncImagePainter
 
 private fun safeParseColor(hex: String, fallback: Color): Color {
     return try {
@@ -270,37 +271,167 @@ fun MainScreen(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Welcome announcement
+                    // Welcome announcement / Customizable greeting card
                     item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        if (appConfigs.value.welcomeSourceType == "image" && appConfigs.value.welcomeImagePath.isNotBlank()) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        Toast.makeText(context, "الترحيب الخاص بالدليل 🔗", Toast.LENGTH_SHORT).show()
+                                    }
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(42.dp)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .height(130.dp)
                                 ) {
-                                    Icon(Icons.Default.Celebration, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Image(
+                                        painter = rememberAsyncImagePainter(model = appConfigs.value.welcomeImagePath),
+                                        contentDescription = "صورة الترحيب",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                                                )
+                                            )
+                                    )
+                                    Text(
+                                        text = "أهلاً بك في الدليل الخدمي",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
+                                    )
                                 }
-                                Column {
-                                    Text("أهلاً بك في الدليل الخدمي", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
-                                    Text(appConfigs.value.welcomeMessage, fontSize = 11.sp, color = Color.LightGray)
+                            }
+                        } else {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Celebration, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                    Column {
+                                        Text("أهلاً بك في الدليل الخدمي", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
+                                        Text(
+                                            text = appConfigs.value.welcomeMessage,
+                                            fontSize = appConfigs.value.welcomeFontSize.sp,
+                                            color = Color.LightGray
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Dynamic Carousel Marketing Banners
-                    if (banners.isNotEmpty()) {
+                    // Customizable Approved Advertisement / Dynamic Banners
+                    if (appConfigs.value.adIsVisible) {
                         item {
-                            val activeBanner = banners.first() // Rotates or picks prominent
+                            val isExpired = remember(appConfigs.value.adStartTimeMillis, appConfigs.value.adShowDurationDays) {
+                                if (appConfigs.value.adStartTimeMillis == 0L) false
+                                else {
+                                    val durationMillis = appConfigs.value.adShowDurationDays * 24L * 60L * 60L * 1000L
+                                    System.currentTimeMillis() - appConfigs.value.adStartTimeMillis > durationMillis
+                                }
+                            }
+                            if (!isExpired) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(125.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        if (appConfigs.value.adSourceType != "text" && appConfigs.value.adImagePath.isNotBlank()) {
+                                            Image(
+                                                painter = rememberAsyncImagePainter(model = appConfigs.value.adImagePath),
+                                                contentDescription = "الإعلان المعتمد",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                                                        )
+                                                    )
+                                            )
+                                            // Title and desc overlay
+                                            Column(
+                                                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
+                                            ) {
+                                                Text(appConfigs.value.adTextTitle, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                                                Text(appConfigs.value.adTextDescription, fontSize = 10.sp, color = Color.LightGray)
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        Brush.linearGradient(
+                                                            colors = listOf(
+                                                                MaterialTheme.colorScheme.surface,
+                                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                                            )
+                                                        )
+                                                    )
+                                                    .padding(16.dp)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.align(Alignment.CenterStart),
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text(
+                                                        text = appConfigs.value.adTextTitle,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = appConfigs.value.adTextDescription,
+                                                        fontSize = 10.sp,
+                                                        color = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Badge(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                                        ) {
+                                            Text("إعلان معتمد", fontSize = 8.sp, color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (banners.isNotEmpty()) {
+                        item {
+                            val activeBanner = banners.first()
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -342,7 +473,7 @@ fun MainScreen(
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.align(Alignment.TopEnd)
                                     ) {
-                                        Text(isEnglishLanguage.let { "إعلان معتمد" }, fontSize = 8.sp, color = Color.Black, modifier = Modifier.padding(2.dp))
+                                        Text("إعلان معتمد", fontSize = 8.sp, color = Color.Black, modifier = Modifier.padding(2.dp))
                                     }
                                 }
                             }
