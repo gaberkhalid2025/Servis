@@ -74,6 +74,16 @@ data class AppConfigs(
     val adminPassword: String = "maher736462",
     val isMaintenanceActive: Boolean = false,
     val smartAssistantSize: Float = 56f,
+    val assistantOpacity: Float = 1f,
+    val assistantOffsetX: Float = 16f,
+    val assistantOffsetY: Float = 16f,
+    val assistantColorHex: String = "#FFD700",
+    val showFloatingContact: Boolean = true,
+    val floatingContactSize: Float = 56f,
+    val floatingContactOpacity: Float = 1f,
+    val floatingContactOffsetX: Float = 80f,
+    val floatingContactOffsetY: Float = 16f,
+    val floatingContactColorHex: String = "#25D366",
     val showPromoFooter: Boolean = true,
     val showDashboardFavorites: Boolean = true,
     val showDashboardCallHistory: Boolean = true,
@@ -154,6 +164,15 @@ data class ContactLog(
     val providerId: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val mode: String = "Call" // "Call" or "WhatsApp"
+)
+
+@Immutable
+data class ChatMessage(
+    val id: String = "",
+    val providerId: String = "",
+    val sender: String = "", // "provider" or "admin"
+    val message: String = "",
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 

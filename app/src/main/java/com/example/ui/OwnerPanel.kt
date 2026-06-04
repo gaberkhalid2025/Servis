@@ -203,7 +203,11 @@ fun OwnerPanel(
                                 listOf(
                                     "Cosmic Slate" to "🌌 كوزميك سيلفر (فضي داكن)",
                                     "Charcoal Gold" to "✨ الذهبي الفاخر (فحمي فاخر)",
-                                    "Royal Emerald" to "🟢 الزمردي الراقي (أخضر ملكي)"
+                                    "Royal Emerald" to "🟢 الزمردي الراقي (أخضر ملكي)",
+                                    "Vibrant Red" to "🔴 أحمر ناري (Vibrant Red)",
+                                    "Deep Black" to "⚫ أسود حالك (Deep Black)",
+                                    "Neon Blue" to "🔵 أزرق نيون (Neon Blue)",
+                                    "Metallic Silver" to "⚪ فضي معدني (Metallic Silver)"
                                 ).forEach { (code, label) ->
                                     Row(
                                         modifier = Modifier
@@ -600,17 +604,65 @@ fun OwnerPanel(
                         // Smart Assistant Floating config options
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("تعديل وتحديد تكييف المساعد الذكي الدائري", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                                Text("تخصيص المساعد الذكي الدائري 🤖", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
 
                                 var assistantSizeInput by remember { mutableStateOf(appConfigs.value.smartAssistantSize) }
-                                Text("حجم الزر العائم المساعد: ${assistantSizeInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                Text("حجم أيقونة المساعد: ${assistantSizeInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
                                 Slider(
                                     value = assistantSizeInput,
                                     onValueChange = { assistantSizeInput = it },
-                                    valueRange = 40f..100f,
+                                    valueRange = 40f..120f,
                                     onValueChangeFinished = {
                                         FirestoreSim.updateConfigs(context, appConfigs.value.copy(smartAssistantSize = assistantSizeInput))
                                     }
+                                )
+
+                                var assistantOpacityInput by remember { mutableStateOf(appConfigs.value.assistantOpacity) }
+                                Text("شفافية المساعد: ${(assistantOpacityInput * 100).toInt()}%", fontSize = 12.sp, color = Color.White)
+                                Slider(
+                                    value = assistantOpacityInput,
+                                    onValueChange = { assistantOpacityInput = it },
+                                    valueRange = 0.10f..1f,
+                                    onValueChangeFinished = {
+                                        FirestoreSim.updateConfigs(context, appConfigs.value.copy(assistantOpacity = assistantOpacityInput))
+                                    }
+                                )
+
+                                var assistantOffsetXInput by remember { mutableStateOf(appConfigs.value.assistantOffsetX) }
+                                Text("إزاحة المساعد الأفقية: ${assistantOffsetXInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                Slider(
+                                    value = assistantOffsetXInput,
+                                    onValueChange = { assistantOffsetXInput = it },
+                                    valueRange = -100f..100f,
+                                    onValueChangeFinished = {
+                                        FirestoreSim.updateConfigs(context, appConfigs.value.copy(assistantOffsetX = assistantOffsetXInput))
+                                    }
+                                )
+
+                                var assistantOffsetYInput by remember { mutableStateOf(appConfigs.value.assistantOffsetY) }
+                                Text("إزاحة المساعد الرأسية: ${assistantOffsetYInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                Slider(
+                                    value = assistantOffsetYInput,
+                                    onValueChange = { assistantOffsetYInput = it },
+                                    valueRange = -100f..100f,
+                                    onValueChangeFinished = {
+                                        FirestoreSim.updateConfigs(context, appConfigs.value.copy(assistantOffsetY = assistantOffsetYInput))
+                                    }
+                                )
+
+                                var assistantColorInput by remember { mutableStateOf(appConfigs.value.assistantColorHex) }
+                                OutlinedTextField(
+                                    value = assistantColorInput,
+                                    onValueChange = {
+                                        assistantColorInput = it
+                                        if (it.length >= 4 && (it.startsWith("#") || it.length == 7)) {
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(assistantColorHex = it))
+                                        }
+                                    },
+                                    label = { Text("رمز لون المساعد (مثال: FFD700#)", fontSize = 11.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                                    singleLine = true
                                 )
 
                                 Row(
@@ -625,6 +677,87 @@ fun OwnerPanel(
                                             FirestoreSim.updateConfigs(context, appConfigs.value.copy(showPromoFooter = visible))
                                             Toast.makeText(context, "تم حفظ خيار عرض التذييل بالتطبيق!", Toast.LENGTH_SHORT).show()
                                         }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Floating Direct Contact Customization
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("أيقونة التواصل المباشر بجوار المعلومات 📲", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                                    Switch(
+                                        checked = appConfigs.value.showFloatingContact,
+                                        onCheckedChange = { visible ->
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(showFloatingContact = visible))
+                                            Toast.makeText(context, "تم تعديل خيار عرض أيقونة التواصل العائمة!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+
+                                if (appConfigs.value.showFloatingContact) {
+                                    var contactSizeInput by remember { mutableStateOf(appConfigs.value.floatingContactSize) }
+                                    Text("حجم أيقونة التواصل: ${contactSizeInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                    Slider(
+                                        value = contactSizeInput,
+                                        onValueChange = { contactSizeInput = it },
+                                        valueRange = 40f..120f,
+                                        onValueChangeFinished = {
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(floatingContactSize = contactSizeInput))
+                                        }
+                                    )
+
+                                    var contactOpacityInput by remember { mutableStateOf(appConfigs.value.floatingContactOpacity) }
+                                    Text("شفافية التواصل: ${(contactOpacityInput * 100).toInt()}%", fontSize = 12.sp, color = Color.White)
+                                    Slider(
+                                        value = contactOpacityInput,
+                                        onValueChange = { contactOpacityInput = it },
+                                        valueRange = 0.10f..1f,
+                                        onValueChangeFinished = {
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(floatingContactOpacity = contactOpacityInput))
+                                        }
+                                    )
+
+                                    var contactOffsetXInput by remember { mutableStateOf(appConfigs.value.floatingContactOffsetX) }
+                                    Text("إزاحة التواصل الأفقية: ${contactOffsetXInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                    Slider(
+                                        value = contactOffsetXInput,
+                                        onValueChange = { contactOffsetXInput = it },
+                                        valueRange = -100f..100f,
+                                        onValueChangeFinished = {
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(floatingContactOffsetX = contactOffsetXInput))
+                                        }
+                                    )
+
+                                    var contactOffsetYInput by remember { mutableStateOf(appConfigs.value.floatingContactOffsetY) }
+                                    Text("إزاحة التواصل الرأسية: ${contactOffsetYInput.toInt()}dp", fontSize = 12.sp, color = Color.White)
+                                    Slider(
+                                        value = contactOffsetYInput,
+                                        onValueChange = { contactOffsetYInput = it },
+                                        valueRange = -100f..100f,
+                                        onValueChangeFinished = {
+                                            FirestoreSim.updateConfigs(context, appConfigs.value.copy(floatingContactOffsetY = contactOffsetYInput))
+                                        }
+                                    )
+
+                                    var contactColorInput by remember { mutableStateOf(appConfigs.value.floatingContactColorHex) }
+                                    OutlinedTextField(
+                                        value = contactColorInput,
+                                        onValueChange = {
+                                            contactColorInput = it
+                                            if (it.length >= 4 && (it.startsWith("#") || it.length == 7)) {
+                                                FirestoreSim.updateConfigs(context, appConfigs.value.copy(floatingContactColorHex = it))
+                                            }
+                                        },
+                                        label = { Text("رمز لون التواصل المباشر (مثال: #25D366)", fontSize = 11.sp) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = writeTextColor, unfocusedTextColor = writeTextColor),
+                                        singleLine = true
                                     )
                                 }
                             }
@@ -696,6 +829,99 @@ fun OwnerPanel(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text("حفظ التغييرات وبيانات الدعم")
+                        }
+
+                        // Live Chat Responses Section for Admin (المهن مع الادمن عبر رسائل)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("رسائل الدعم الفني والمهن الواردة 💬", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                                val chatMessages = FirestoreSim.chatMessages.collectAsState().value
+                                
+                                if (chatMessages.isEmpty()) {
+                                    Text("لا توجد رسائل واردة حالياً من مقدمي الخدمات أو الزوار.", fontSize = 12.sp, color = Color.Gray)
+                                } else {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        chatMessages.takeLast(12).forEach { chatMsg ->
+                                            val isFromAdmin = chatMsg.sender == "admin"
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = if (isFromAdmin) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color(0xFF1E1E22)
+                                                ),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = if (isFromAdmin) "رد الإدارة 🛡️" else "من: زائر / صاحب مهنة 👤",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isFromAdmin) MaterialTheme.colorScheme.primary else Color.LightGray
+                                                        )
+                                                        Text(
+                                                            text = chatMsg.message,
+                                                            fontSize = 13.sp,
+                                                            color = Color.White
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Divider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
+
+                                        // Admin Quick Reply input
+                                        var adminReplyText by remember { mutableStateOf("") }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedTextField(
+                                                value = adminReplyText,
+                                                onValueChange = { adminReplyText = it },
+                                                placeholder = { Text("اكتب رد الإدارة الفوري هنا...") },
+                                                modifier = Modifier.weight(1f),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedTextColor = writeTextColor,
+                                                    unfocusedTextColor = writeTextColor
+                                                ),
+                                                singleLine = true
+                                            )
+                                            Button(
+                                                onClick = {
+                                                    if (adminReplyText.isNotBlank()) {
+                                                        FirestoreSim.sendChatMessage(
+                                                            context,
+                                                            ChatMessage(
+                                                                id = "msg_${System.currentTimeMillis()}",
+                                                                providerId = "admin",
+                                                                sender = "admin",
+                                                                message = adminReplyText,
+                                                                timestamp = System.currentTimeMillis()
+                                                            )
+                                                        )
+                                                        adminReplyText = ""
+                                                        Toast.makeText(context, "تم إرسال رد الإدارة فورياً!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                            ) {
+                                                Text("رد", fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

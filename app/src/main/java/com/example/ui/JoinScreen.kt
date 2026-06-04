@@ -23,10 +23,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.text.style.TextAlign
 import com.example.data.FirestoreSim
 import com.example.data.PendingProvider
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.getSelectedTextColor
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +74,28 @@ fun JoinScreen(
     var addressError by remember { mutableStateOf(false) }
     var districtError by remember { mutableStateOf(false) }
     var avatarError by remember { mutableStateOf(false) }
+
+    var showImageSourceSheet by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            avatarImageUri = uri.toString()
+            avatarError = false
+            Toast.makeText(context, "تم اختيار الصورة من الاستوديو بنجاح!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: android.graphics.Bitmap? ->
+        if (bitmap != null) {
+            avatarImageUri = "camera_capture_${System.currentTimeMillis()}"
+            avatarError = false
+            Toast.makeText(context, "تم التقاط الصورة بالكاميرا بنجاح!", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Cascaded sub-categories helper list
     val filteredSubCats = remember(selectedMainCat) {
@@ -364,7 +391,7 @@ fun JoinScreen(
                     color = if (avatarError) AlertRed else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                     shape = RoundedCornerShape(12.dp)
                 ),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = CardDefaults.cardColors().containerColor),
             shape = RoundedCornerShape(12.dp)
         ) {
             Row(
@@ -375,16 +402,14 @@ fun JoinScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("الصورة الشخصية للملف (إجباري)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
                     Text(
-                        text = if (avatarImageUri.isEmpty()) "لم يتم اختيار صورة بعد" else "تم تحميل: profile_image.png ✓",
-                        color = if (avatarImageUri.isEmpty()) SoftWhite else MaterialTheme.colorScheme.primary,
+                        text = if (avatarImageUri.isEmpty()) "لم يتم اختيار صورة بعد" else if (avatarImageUri.startsWith("camera_capture")) "تم الالتقاط بالكاميرا الفورية ✓" else "تم الاختيار من الاستوديو ✓",
+                        color = if (avatarImageUri.isEmpty()) Color.LightGray else MaterialTheme.colorScheme.primary,
                         fontSize = 11.sp
                     )
                 }
                 Button(
                     onClick = {
-                        avatarImageUri = "avatar_uploaded_${System.currentTimeMillis()}"
-                        avatarError = false
-                        Toast.makeText(context, "تم التقاط ورفع الصورة الشخصية للملف!", Toast.LENGTH_SHORT).show()
+                        showImageSourceSheet = true
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -396,6 +421,72 @@ fun JoinScreen(
         }
         if (avatarError) {
             Text("رفع الصورة الشخصية إجباري لمطابقة الملف الفني", color = AlertRed, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
+        }
+
+        // --- Custom Image Selection Source Dialog/Menu ---
+        if (showImageSourceSheet) {
+            Dialog(onDismissRequest = { showImageSourceSheet = false }) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text("طريقة التقاط/رفع الصورة 👤", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("يرجى اختيار التقاط فوري ومباشر بكاميرا الهاتف أو اختيار صورة من استوديو الصور المتاح.", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+
+                        Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Camera Option
+                            Button(
+                                onClick = {
+                                    showImageSourceSheet = false
+                                    try {
+                                        cameraLauncher.launch()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "عذراً، لم تتم تهيئة الكاميرا بالبيئة الحالية.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("الكاميرا 📷", fontSize = 12.sp)
+                            }
+
+                            // Gallery Option
+                            Button(
+                                onClick = {
+                                    showImageSourceSheet = false
+                                    galleryLauncher.launch("image/*")
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                            ) {
+                                Icon(Icons.Default.Photo, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("الاستوديو 🖼️", fontSize = 12.sp)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { showImageSourceSheet = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("إلغاء")
+                        }
+                    }
+                }
+            }
         }
 
         // --- Field 9: صورة بطاقة الهوية الشخصية (اختياري) ---

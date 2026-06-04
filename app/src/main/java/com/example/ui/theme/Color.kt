@@ -23,6 +23,34 @@ val EmeraldPrimaryGreen = Color(0xFF10B981)
 val EmeraldAccentGreen = Color(0xFFA7F3D0)
 val EmeraldTextOnPrimary = Color(0xFF041E14)
 
+// --- Theme 4: Vibrant Red (🔴 الأحمر الناري) ---
+val RedBackground = Color(0xFF120808)
+val RedCardBg = Color(0xFF1E1010)
+val RedPrimary = Color(0xFFEF4444)
+val RedAccent = Color(0xFFF87171)
+val RedTextOnPrimary = Color.White
+
+// --- Theme 5: Deep Black (⚫ الأسود الحالك) ---
+val BlackBackground = Color(0xFF000000)
+val BlackCardBg = Color(0xFF121212)
+val BlackPrimary = Color(0xFFFFFFFF)
+val BlackAccent = Color(0xFFD1D5DB)
+val BlackTextOnPrimary = Color.Black
+
+// --- Theme 6: Neon Blue (🔵 الأزرق النيون) ---
+val BlueBackground = Color(0xFF090D16)
+val BlueCardBg = Color(0xFF1F2937)
+val BluePrimary = Color(0xFF3B82F6)
+val BlueAccent = Color(0xFF60A5FA)
+val BlueTextOnPrimary = Color.White
+
+// --- Theme 7: Metallic Silver (⚪ الفضي المعدني) ---
+val SilverBackground = Color(0xFF1F2937)
+val SilverCardBg = Color(0xFF374151)
+val SilverPrimary = Color(0xFFCBD5E1)
+val SilverAccent = Color(0xFFF1F5F9)
+val SilverTextOnPrimary = Color.Black
+
 // --- Text Writing Styles ---
 val BrightWhiteText = Color(0xFFFFFFFF)
 val LightGoldText = Color(0xFFFFF0A5)

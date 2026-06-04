@@ -71,6 +71,9 @@ object FirestoreSim {
     private val _contactHistory = MutableStateFlow<List<ContactLog>>(emptyList())
     val contactHistory: StateFlow<List<ContactLog>> = _contactHistory.asStateFlow()
 
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
+
     // Sync state visual notifications
     private val _syncStatus = MutableStateFlow("متزامن بالكامل مع السحابة المركزية")
     val syncStatus: StateFlow<String> = _syncStatus.asStateFlow()
@@ -228,6 +231,16 @@ object FirestoreSim {
             editor.putString("admin_password", _appConfigs.value.adminPassword)
             editor.putBoolean("maintenance_active", _appConfigs.value.isMaintenanceActive)
             editor.putFloat("assistant_size", _appConfigs.value.smartAssistantSize)
+            editor.putFloat("assistant_opacity", _appConfigs.value.assistantOpacity)
+            editor.putFloat("assistant_offset_x", _appConfigs.value.assistantOffsetX)
+            editor.putFloat("assistant_offset_y", _appConfigs.value.assistantOffsetY)
+            editor.putString("assistant_color_hex", _appConfigs.value.assistantColorHex)
+            editor.putBoolean("show_floating_contact", _appConfigs.value.showFloatingContact)
+            editor.putFloat("floating_contact_size", _appConfigs.value.floatingContactSize)
+            editor.putFloat("floating_contact_opacity", _appConfigs.value.floatingContactOpacity)
+            editor.putFloat("floating_contact_offset_x", _appConfigs.value.floatingContactOffsetX)
+            editor.putFloat("floating_contact_offset_y", _appConfigs.value.floatingContactOffsetY)
+            editor.putString("floating_contact_color_hex", _appConfigs.value.floatingContactColorHex)
             editor.putBoolean("show_footer", _appConfigs.value.showPromoFooter)
             editor.putFloat("category_icon_size", _appConfigs.value.categoryIconSize)
 
@@ -258,6 +271,7 @@ object FirestoreSim {
             editor.putString("favorites_serial", serializeFavorites(_favorites.value))
             editor.putString("contact_history_serial", serializeContactHistory(_contactHistory.value))
             editor.putString("moderators_serial", serializeModerators(_moderators.value))
+            editor.putString("chat_messages_serial", serializeChatMessages(_chatMessages.value))
 
             editor.apply()
         } catch (e: Exception) {
@@ -279,6 +293,16 @@ object FirestoreSim {
                 adminPassword = prefs.getString("admin_password", "maher736462") ?: "maher736462",
                 isMaintenanceActive = prefs.getBoolean("maintenance_active", false),
                 smartAssistantSize = prefs.getFloat("assistant_size", 56f),
+                assistantOpacity = prefs.getFloat("assistant_opacity", 1f),
+                assistantOffsetX = prefs.getFloat("assistant_offset_x", 0f),
+                assistantOffsetY = prefs.getFloat("assistant_offset_y", 0f),
+                assistantColorHex = prefs.getString("assistant_color_hex", "#FFD700") ?: "#FFD700",
+                showFloatingContact = prefs.getBoolean("show_floating_contact", true),
+                floatingContactSize = prefs.getFloat("floating_contact_size", 56f),
+                floatingContactOpacity = prefs.getFloat("floating_contact_opacity", 1f),
+                floatingContactOffsetX = prefs.getFloat("floating_contact_offset_x", 0f),
+                floatingContactOffsetY = prefs.getFloat("floating_contact_offset_y", 0f),
+                floatingContactColorHex = prefs.getString("floating_contact_color_hex", "#25D366") ?: "#25D366",
                 showPromoFooter = prefs.getBoolean("show_footer", true),
                 showDashboardFavorites = prefs.getBoolean("show_dashboard_favs", true),
                 showDashboardCallHistory = prefs.getBoolean("show_dashboard_history", true),
@@ -333,6 +357,9 @@ object FirestoreSim {
             }
             prefs.getString("moderators_serial", null)?.let {
                 _moderators.value = deserializeModerators(it)
+            }
+            prefs.getString("chat_messages_serial", null)?.let {
+                _chatMessages.value = deserializeChatMessages(it)
             }
         } catch (e: Exception) {
             Log.e("FirestoreSim", "Error loading data from SharedPreferences", e)
@@ -952,6 +979,35 @@ object FirestoreSim {
         return s.split(";").mapNotNull {
             val p = it.split(",")
             if (p.size >= 4) ContactLog(p[0], p[1], p[2].toLongOrNull() ?: System.currentTimeMillis(), p[3]) else null
+        }
+    }
+
+    fun sendChatMessage(context: Context, msg: ChatMessage) {
+        val current = _chatMessages.value.toMutableList()
+        current.add(msg)
+        _chatMessages.value = current
+        saveToDisk(context)
+        triggerUpdate("chat_messages")
+    }
+
+    private fun serializeChatMessages(list: List<ChatMessage>): String {
+        return list.joinToString(";") {
+            val encodedMsg = java.net.URLEncoder.encode(it.message, "UTF-8")
+            "${it.id},${it.providerId},${it.sender},$encodedMsg,${it.timestamp}"
+        }
+    }
+    private fun deserializeChatMessages(s: String): List<ChatMessage> {
+        if (s.isBlank()) return emptyList()
+        return s.split(";").mapNotNull {
+            val p = it.split(",")
+            if (p.size >= 5) {
+                val decodedMsg = try {
+                    java.net.URLDecoder.decode(p[3], "UTF-8")
+                } catch (e: Exception) {
+                    p[3]
+                }
+                ChatMessage(p[0], p[1], p[2], decodedMsg, p[4].toLongOrNull() ?: System.currentTimeMillis())
+            } else null
         }
     }
 }

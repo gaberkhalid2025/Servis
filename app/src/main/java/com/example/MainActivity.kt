@@ -3,6 +3,7 @@ package com.example
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,6 +48,27 @@ class MainActivity : ComponentActivity() {
                 var currentSessionRole by remember { mutableStateOf("none") } // "none", "moderator", "owner"
 
                 val globalConfigs = FirestoreSim.appConfigs.collectAsState().value
+
+                var lastBackPressTime by remember { mutableStateOf(0L) }
+                val context = LocalContext.current
+                val activity = context as? android.app.Activity
+
+                BackHandler(enabled = true) {
+                    if (currentScreen != "home") {
+                        if (currentSessionRole == "temp_bypass") {
+                            currentSessionRole = "none"
+                        }
+                        currentScreen = "home"
+                    } else {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastBackPressTime < 2000) {
+                            activity?.finish()
+                        } else {
+                            lastBackPressTime = currentTime
+                            Toast.makeText(context, "اضغط مرة أخرى للخروج من التطبيق", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
 
                 // If maintenance active AND the logged-in user isn't admin/owner, show lock screen
                 if (globalConfigs.isMaintenanceActive && currentSessionRole == "none") {

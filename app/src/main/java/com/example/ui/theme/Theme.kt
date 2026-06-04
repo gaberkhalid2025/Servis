@@ -43,6 +43,54 @@ private val RoyalEmeraldPalette = darkColorScheme(
     onSurface = Color.White
 )
 
+private val VibrantRedPalette = darkColorScheme(
+    primary = RedPrimary,
+    secondary = RedAccent,
+    tertiary = RedPrimary,
+    background = RedBackground,
+    surface = RedCardBg,
+    onPrimary = RedTextOnPrimary,
+    onSecondary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White
+)
+
+private val DeepBlackPalette = darkColorScheme(
+    primary = BlackPrimary,
+    secondary = BlackAccent,
+    tertiary = BlackPrimary,
+    background = BlackBackground,
+    surface = BlackCardBg,
+    onPrimary = BlackTextOnPrimary,
+    onSecondary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White
+)
+
+private val NeonBluePalette = darkColorScheme(
+    primary = BluePrimary,
+    secondary = BlueAccent,
+    tertiary = BluePrimary,
+    background = BlueBackground,
+    surface = BlueCardBg,
+    onPrimary = BlueTextOnPrimary,
+    onSecondary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White
+)
+
+private val MetallicSilverPalette = darkColorScheme(
+    primary = SilverPrimary,
+    secondary = SilverAccent,
+    tertiary = SilverPrimary,
+    background = SilverBackground,
+    surface = SilverCardBg,
+    onPrimary = SilverTextOnPrimary,
+    onSecondary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White
+)
+
 @Composable
 fun DynamicAppTheme(
     themeName: String,
@@ -52,6 +100,10 @@ fun DynamicAppTheme(
     val colorScheme = when (themeName) {
         "Charcoal Gold" -> CharcoalGoldPalette
         "Royal Emerald" -> RoyalEmeraldPalette
+        "Vibrant Red" -> VibrantRedPalette
+        "Deep Black" -> DeepBlackPalette
+        "Neon Blue" -> NeonBluePalette
+        "Metallic Silver" -> MetallicSilverPalette
         else -> CosmicColorPalette
     }
 

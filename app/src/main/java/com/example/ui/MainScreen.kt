@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,14 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.*
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.getSelectedTextColor
+
+private fun safeParseColor(hex: String, fallback: Color): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (e: Exception) {
+        fallback
+    }
+}
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +99,8 @@ fun MainScreen(
 
     // Assistant Dialogue toggle
     var isAssistantChatOpen by remember { mutableStateOf(false) }
+    var isContactOptionsOpen by remember { mutableStateOf(false) }
+    var isAdminChatOpen by remember { mutableStateOf(false) }
 
     // Voice search simulator toggle
     var isVoiceRecordingActive by remember { mutableStateOf(false) }
@@ -766,16 +777,41 @@ fun MainScreen(
                 .navigationBarsPadding()
                 .padding(vertical = 12.dp, horizontal = 16.dp)
         ) {
-            // LEFT FOOTER COMPONENT: ℹ️ About the app and helpful developer info button
+            // LEFT FOOTER COMPONENT: ℹ️ About the app and helpful developer info button + Floating Contact Button
             Row(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .clickable { onNavigate("about") },
+                modifier = Modifier.align(Alignment.CenterStart),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Icon(Icons.Default.Info, contentDescription = "معلومات عن الصفحة", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                Text("المعلومات", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.clickable { onNavigate("about") },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = "معلومات عن الصفحة", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    Text("المعلومات", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+
+                // FLOATING CONTACT BUTTON (أيقونة التواصل العائمة) - بجوار أيقونة المعلومات
+                if (appConfigs.value.showFloatingContact) {
+                    val contactBaseColor = safeParseColor(appConfigs.value.floatingContactColorHex, Color(0xFF25D366))
+                    Box(
+                        modifier = Modifier
+                            .offset(x = appConfigs.value.floatingContactOffsetX.dp, y = appConfigs.value.floatingContactOffsetY.dp)
+                            .size(appConfigs.value.floatingContactSize.dp)
+                            .alpha(appConfigs.value.floatingContactOpacity)
+                            .background(contactBaseColor, CircleShape)
+                            .clickable { isContactOptionsOpen = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = "اتصال مباشر",
+                            tint = Color.White,
+                            modifier = Modifier.size((appConfigs.value.floatingContactSize * 0.5f).dp)
+                        )
+                    }
+                }
             }
 
             // MIDDLE FOOTER COMPONENT: Custom Admin Promo WAM Badge
@@ -790,19 +826,22 @@ fun MainScreen(
                 )
             }
 
-            // RIGHT FOOTER COMPONENT: The circular smart assistant float button
+            // RIGHT FOOTER COMPONENT: The circular smart assistant float button with user configs
+            val assistantBaseColor = safeParseColor(appConfigs.value.assistantColorHex, MaterialTheme.colorScheme.primary)
             Row(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
+                    .offset(x = appConfigs.value.assistantOffsetX.dp, y = appConfigs.value.assistantOffsetY.dp)
+                    .alpha(appConfigs.value.assistantOpacity)
                     .clickable { isAssistantChatOpen = true },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("المساعد", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text("المساعد", fontSize = 12.sp, color = assistantBaseColor, fontWeight = FontWeight.Bold)
                 Box(
                     modifier = Modifier
                         .size(appConfigs.value.smartAssistantSize.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        .background(assistantBaseColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -1193,6 +1232,216 @@ fun MainScreen(
     // Opens Smart Assistant chat
     if (isAssistantChatOpen) {
         AssistantDialog(onDismiss = { isAssistantChatOpen = false })
+    }
+
+    // Direct Admin/Provider Chat Dialog
+    if (isAdminChatOpen) {
+        var chatInputText by remember { mutableStateOf("") }
+        val chatMessages = FirestoreSim.chatMessages.collectAsState().value
+
+        Dialog(onDismissRequest = { isAdminChatOpen = false }) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.85f)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("دردشة الدعم والمهن 💬", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                        IconButton(onClick = { isAdminChatOpen = false }) {
+                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray)
+                        }
+                    }
+                    
+                    Text(
+                        "تواصل آمن ومباشر مع عملاء وإدارة الدليل لطرح الشكاوى، طلب الدعم، أو توثيق العضوية الفنية لعام 2026.",
+                        fontSize = 11.sp,
+                        color = Color.LightGray,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
+
+                    // Chat message bubbles
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(chatMessages) { chatMsg ->
+                                val isMe = chatMsg.sender == "provider"
+                                val bubbleBg = if (isMe) MaterialTheme.colorScheme.primary else Color(0xFF2C2C2E)
+                                val bubbleContentColor = if (isMe) MaterialTheme.colorScheme.onPrimary else Color.White
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                ) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = bubbleBg),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.widthIn(max = 240.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Text(
+                                                text = if (isMe) "أنت" else "الإدارة الذكية 🛡️",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp,
+                                                color = bubbleContentColor.copy(alpha = 0.7f)
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = chatMsg.message,
+                                                fontSize = 13.sp,
+                                                color = bubbleContentColor,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Compose chat
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = chatInputText,
+                            onValueChange = { chatInputText = it },
+                            placeholder = { Text("اكتب رسالتك للإدارة هنا...") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = writeTextColor,
+                                unfocusedTextColor = writeTextColor
+                            ),
+                            singleLine = true
+                        )
+                        Button(
+                            onClick = {
+                                if (chatInputText.isNotBlank()) {
+                                    FirestoreSim.sendChatMessage(
+                                        context,
+                                        ChatMessage(
+                                            id = "msg_${System.currentTimeMillis()}",
+                                            providerId = "direct_user",
+                                            sender = "provider",
+                                            message = chatInputText,
+                                            timestamp = System.currentTimeMillis()
+                                        )
+                                    )
+                                    chatInputText = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("إرسال", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Floating Contact selection Dialog (Support menu)
+    if (isContactOptionsOpen) {
+        val configs = appConfigs.value
+        Dialog(onDismissRequest = { isContactOptionsOpen = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("التواصل المباشر مع الدعم والإدارة", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("يسعدنا خدمتك والرد على استفسارك طوال 24 ساعة!", fontSize = 12.sp, color = Color.Gray, textAlign = TextAlign.Center)
+
+                    Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+
+                    // 1. Phone call option
+                    Button(
+                        onClick = {
+                            isContactOptionsOpen = false
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                                    data = android.net.Uri.parse("tel:${configs.supportPhone}")
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "جاري طلب الرقم المباشر: ${configs.supportPhone}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("اتصال مباشر بالهاتف (${configs.supportPhone})", fontWeight = FontWeight.Bold)
+                    }
+
+                    // 2. WhatsApp support option
+                    Button(
+                        onClick = {
+                            isContactOptionsOpen = false
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                    data = android.net.Uri.parse("https://api.whatsapp.com/send?phone=${configs.supportWhatsApp}")
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "رابط واتساب الدعم: ${configs.supportWhatsApp}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                    ) {
+                        Text("مراسلة واتساب الدعم المباشر (2 hour response)", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    // 3. Admin direct chat option
+                    OutlinedButton(
+                        onClick = {
+                            isContactOptionsOpen = false
+                            isAdminChatOpen = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Chat, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("محادثة فورية (شات المهن والدعم مع الإدارة)", color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    OutlinedButton(
+                        onClick = { isContactOptionsOpen = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("إغلاق القائمة")
+                    }
+                }
+            }
+        }
     }
 
     // Opens User Dashboard (M3 Dialog)

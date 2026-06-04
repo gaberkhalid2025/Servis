@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,69 +38,120 @@ fun AssistantDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.8f)
-                .padding(10.dp),
+                .fillMaxHeight(0.85f)
+                .padding(10.dp)
+                .border(2.dp, Color(0xFFFFD700), RoundedCornerShape(24.dp)),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = Color(0xFF131114)
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Header
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Header Block: Close Button ('X') on the left, Title "المساعد الذكي (خدمات) ⚡" on the right in RTL vibe.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.primary)
-                        .padding(16.dp)
+                        .padding(bottom = 4.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Text(
-                        text = "المساعد الذكي 🤖",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterStart)
-                    )
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                        modifier = Modifier.align(Alignment.CenterStart)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "اغلاق",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "⚡ المساعد الذكي (خدمات) ⚡",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
                 }
 
-                // Chat body
-                LazyColumn(
+                // Scrollable Chat/Information Area
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
-                        .padding(12.dp),
+                        .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(messages) { msg ->
-                        BubbleChat(message = msg)
+                    // Description Info Card as in the screenshot
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF1F1B24)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                text = "أنا مساعدك الذكي لمختلف الأقسام (طوارئ 🚨، عيادات ومستشفيات 🏥، كهرباء وسباكة 🛠️، تعليم 🎓، سيارات 🚗).",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                lineHeight = 22.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Right
+                            )
+                            Text(
+                                text = "كيف يمكنني مساعدتك اليوم؟ يمكنك كتابة استفسارك للبحث السريع.",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Right
+                            )
+                        }
+                    }
+
+                    // Interactive chat replies when messages are exchanged
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(messages) { msg ->
+                            BubbleChat(message = msg)
+                        }
                     }
                 }
 
                 // Preset suggestion chips
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val contextLocal = LocalContextCurrent()
-                    listOf("أريد كهربائي صيانة", "كيف أسجل مهنتي؟", "من الموصى بهم؟").forEach { hint ->
+                    listOf("كهربائي صيانة", "كيف أسجل مهنتي؟", "من الموصى بهم؟").forEach { hint ->
                         Card(
                             shape = RoundedCornerShape(50),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                containerColor = Color(0xFFFFD700).copy(alpha = 0.12f)
                             ),
                             modifier = Modifier
                                 .clickable {
@@ -112,58 +164,68 @@ fun AssistantDialog(
                         ) {
                             Text(
                                 text = hint,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                color = Color(0xFFFFD700),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                 }
 
-                // Input field
-                Row(
+                // Text input box with yellow border
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = {
+                        Text(
+                            text = "اسأل: أين أقرب مستشفى طوارئ؟",
+                            color = Color.Gray,
+                            fontSize = 13.sp
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = { Text("اكتب استفسارك هنا...") },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.background,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.background,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF1F1B24),
+                        unfocusedContainerColor = Color(0xFF1F1B24),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFFFD700),
+                        unfocusedBorderColor = Color(0xFFFFD700).copy(alpha = 0.6f)
+                    ),
+                    singleLine = true
+                )
+
+                // Large action button: "إرسال الاستعلام" as in screenshot
+                Button(
+                    onClick = {
+                        if (inputText.isNotBlank()) {
+                            messages.add(Message(inputText, true))
+                            val queryText = inputText
+                            inputText = ""
+                            messages.add(Message("جاري التفكير...", false))
+                            val response = getBotResponse(queryText)
+                            messages.removeAt(messages.size - 1)
+                            messages.add(Message(response, false))
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFD700),
+                        contentColor = Color.Black
                     )
-                    IconButton(
-                        onClick = {
-                            if (inputText.isNotBlank()) {
-                                messages.add(Message(inputText, true))
-                                val userQuery = inputText
-                                inputText = ""
-                                messages.add(Message("جاري التفكير...", false))
-                                val response = getBotResponse(userQuery)
-                                messages.removeAt(messages.size - 1)
-                                messages.add(Message(response, false))
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "ارسال",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
+                ) {
+                    Text(
+                        text = "إرسال الاستعلام",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
