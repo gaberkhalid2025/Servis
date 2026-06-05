@@ -425,9 +425,12 @@ object FirestoreSim {
             neighborhood = request.neighborhood,
             city = request.city,
             profilePhoto = request.profilePhoto,
+            identityPhoto = request.identityPhoto,
             isPinned = false,
             isPremium = false,
-            subscriptionStatus = "active"
+            subscriptionStatus = "active",
+            latitude = request.latitude,
+            longitude = request.longitude
         )
         _providers.value = _providers.value + newProvider
         _pendingProviders.value = _pendingProviders.value.filter { it.id != requestId }
@@ -435,6 +438,36 @@ object FirestoreSim {
 
     fun rejectJoinRequest(requestId: String, reason: String) {
         _pendingProviders.value = _pendingProviders.value.filter { it.id != requestId }
+    }
+
+    fun addPendingProvider(
+        name: String,
+        phone: String,
+        categoryId: String,
+        address: String,
+        neighborhood: String,
+        city: String,
+        profilePhoto: String,
+        identityPhoto: String? = null,
+        hasLocation: Boolean = false,
+        latitude: Double = 15.3694,
+        longitude: Double = 44.1910
+    ) {
+        val newRequest = PendingProvider(
+            id = "pend_" + UUID.randomUUID().toString().take(6),
+            name = name,
+            phone = phone,
+            categoryId = categoryId,
+            address = address,
+            neighborhood = neighborhood,
+            city = city,
+            profilePhoto = profilePhoto,
+            identityPhoto = identityPhoto,
+            hasLocation = hasLocation,
+            latitude = latitude,
+            longitude = longitude
+        )
+        _pendingProviders.value = _pendingProviders.value + newRequest
     }
 
     // -------------------------------------------------------------

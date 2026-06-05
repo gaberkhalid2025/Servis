@@ -35,7 +35,11 @@ data class PendingProvider(
     val address: String,
     val neighborhood: String,
     val city: String,
-    val profilePhoto: String,
+    val profilePhoto: String, // mandatory selfie/personal photo
+    val identityPhoto: String? = null, // optional ID upload
+    val hasLocation: Boolean = false,
+    val latitude: Double = 15.3694,
+    val longitude: Double = 44.1910,
     val status: String = "pending", // pending, approved, rejected
     val rejectReason: String? = null
 )
@@ -92,7 +96,11 @@ data class AppConfigs(
 
     // Default search ranges
     var defaultSearchRangeKm: Int = 10,
-    var isMaintenanceMode: Boolean = false
+    var isMaintenanceMode: Boolean = false,
+
+    // Input text field styling customizable by admin
+    var inputBackgroundColor: String = "#1E293B", // hex color string
+    var inputTextColor: String = "#FFFFFF" // hex color string
 )
 
 data class Review(
