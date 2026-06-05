@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -280,7 +283,7 @@ fun MainScreen() {
                                     activeSupervisor = found
                                     authError = ""
                                 } else {
-                                    authError = "رمز المرور خاطئ! يرجى إدخال الركن الصحيح (تجربة: 1111)."
+                                    authError = "رمز المرور خاطئ! يرجى إدخال رمز المرور الصحيح للوصول."
                                 }
                             }
                         )
@@ -720,6 +723,69 @@ fun MainScreen() {
 }
 
 // -------------------------------------------------------------
+// Welcome Banner Component allowing both text and pictures from phone memory
+// -------------------------------------------------------------
+@Composable
+fun WelcomeBannerView(config: AppConfigs, modifier: Modifier = Modifier) {
+    if (!config.showWelcomeBanner) return
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DeepIndigo),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .border(1.dp, YemenGoldAccent.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!config.welcomeImageBase64.isNullOrBlank()) {
+                val imageBitmap = remember(config.welcomeImageBase64) {
+                    try {
+                        val decodedBytes = android.util.Base64.decode(config.welcomeImageBase64, android.util.Base64.DEFAULT)
+                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                        bitmap?.asImageBitmap()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap,
+                        contentDescription = "Welcome background image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = config.welcomeText,
+                        color = Color.White,
+                        fontSize = config.welcomeTextSize.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                Text(
+                    text = config.welcomeText,
+                    color = Color.White,
+                    fontSize = config.welcomeTextSize.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
 // Users Area - Home Screen Component
 // -------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
@@ -777,6 +843,13 @@ fun HomeScreen(
             .fillMaxSize()
             .padding(12.dp)
     ) {
+        // Welcomer position top
+        if (config.welcomePosition == "top") {
+            item {
+                WelcomeBannerView(config = config)
+            }
+        }
+
         // Search Section Card
         item {
             Card(
@@ -835,6 +908,13 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // Welcomer position below_search
+        if (config.welcomePosition == "below_search") {
+            item {
+                WelcomeBannerView(config = config)
             }
         }
 
@@ -945,6 +1025,13 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // Welcomer position below_map
+        if (config.welcomePosition == "below_map") {
+            item {
+                WelcomeBannerView(config = config)
             }
         }
 
@@ -1460,7 +1547,7 @@ fun AdminAuthScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center)
                 )
 
                 if (error.isNotBlank()) {
@@ -2514,6 +2601,177 @@ fun DynamicWidgetsAndStyleSection(
                 }
             }
         }
+
+        // --- SPECIAL CUSTOM WELCOME BANNER CONFIGURATIONS ---
+        item {
+            var welcomeText by remember { mutableStateOf(configs.welcomeText) }
+            var welcomeFontSize by remember { mutableFloatStateOf(configs.welcomeTextSize) }
+            var welcomePos by remember { mutableStateOf(configs.welcomePosition) }
+            var showBanner by remember { mutableStateOf(configs.showWelcomeBanner) }
+            var selectedBase64 by remember { mutableStateOf(configs.welcomeImageBase64) }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DeepIndigo),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "التحكم في رسالة الترحيب / لافتة الإعلان المميزة",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "يمكنك تعديل نص الرسالة وحجم الخط ومكان ظهورها، أو تفعيل صورة ترحيبية بدلاً من النص يتم اختيارها من ذاكرة تخزين الهاتف.",
+                        color = SoftGrayText,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("عرض اللافتة الترحيبية على الرئيسية", color = Color.White, fontSize = 12.sp)
+                        Switch(
+                            checked = showBanner,
+                            onCheckedChange = {
+                                showBanner = it
+                                FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, welcomePos, selectedBase64, it)
+                            }
+                        )
+                    }
+
+                    if (showBanner) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = welcomeText,
+                            onValueChange = {
+                                welcomeText = it
+                                FirestoreSim.updateWelcomeBanner(it, welcomeFontSize, welcomePos, selectedBase64, showBanner)
+                            },
+                            label = { Text("نص رسالة الترحيب (عند عدم تفعيل صورة)", color = SoftGrayText) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("التحكم بحجم الخط للرسالة: ${welcomeFontSize.toInt()} sp", color = SoftGrayText, fontSize = 11.sp)
+                        Slider(
+                            value = welcomeFontSize,
+                            onValueChange = {
+                                welcomeFontSize = it
+                                FirestoreSim.updateWelcomeBanner(welcomeText, it, welcomePos, selectedBase64, showBanner)
+                            },
+                            valueRange = 10f..30f,
+                            colors = SliderDefaults.colors(thumbColor = YemenGoldAccent, activeTrackColor = YemenGoldAccent)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("مكان ظهور لافتة الترحيب (تحديد الموضع):", color = SoftGrayText, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        val positions = listOf("top" to "أعلى الشاشة", "below_search" to "تحت البحث", "below_map" to "تحت الخريطة")
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            positions.forEach { (posKey, posLabel) ->
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (welcomePos == posKey) YemenGoldAccent else SpaceSlate
+                                    ),
+                                    modifier = Modifier
+                                        .padding(2.dp)
+                                        .clickable {
+                                            welcomePos = posKey
+                                            FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, posKey, selectedBase64, showBanner)
+                                        }
+                                ) {
+                                    Text(
+                                        text = posLabel,
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("اختيار صورة من ذاكرة الهاتف بدلاً من النص الترحيبي:", color = YemenGoldAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text("اختر صورة محملة مسبقاً من ذاكرة الهاتف (محاكاة الاستوديو):", color = SoftGrayText, fontSize = 10.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val banner1Base64 = "iVBORw0KGgoAAAANSUhEUgAAAKAAAABQAQMAAAD/u68HAAAAA1BMVEX/mZn///+nLy64AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUHBAUSDgEFAQGbygYAAAALSURBVCgTYxgFAwUAAAcAAf62qGgAAAAASUVORK5CYII="
+                            val banner2Base64 = "iVBORw0KGgoAAAANSUhEUgAAAKAAAABQAQMAAAD/u68HAAAAA1BMVEX/2Zf///+C5GzJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUHBAUSDgEFAQGbygYAAAALSURBVCgTYxgFAwUAAAcAAf62qGgAAAAASUVORK5CYII="
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = if (selectedBase64 == banner1Base64) MutedGreen else SpaceSlate),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        selectedBase64 = banner1Base64
+                                        FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, welcomePos, banner1Base64, showBanner)
+                                    }
+                            ) {
+                                Text("لافتة ألوان ربيع خضراء 🟩", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(8.dp), textAlign = TextAlign.Center)
+                            }
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = if (selectedBase64 == banner2Base64) YemenGoldAccent else SpaceSlate),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        selectedBase64 = banner2Base64
+                                        FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, welcomePos, banner2Base64, showBanner)
+                                    }
+                            ) {
+                                Text("لافتة زخرفة برونزية ذهبية 🟨", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(8.dp), textAlign = TextAlign.Center)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = {
+                                    val scenicYemenBase64 = "iVBORw0KGgoAAAANSUhEUgAAAKAAAABQAQMAAAD/u68HAAAAA1BMVEWAgICff59PAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUHBAUSDgEFAQGbygYAAAALSURBVCgTYxgFAwUAAAcAAf62qGgAAAAASUVORK5CYII="
+                                    selectedBase64 = scenicYemenBase64
+                                    FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, welcomePos, scenicYemenBase64, showBanner)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = YemenRedAccent),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1.3f)
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, contentDescription = "معرض", modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("اختر من ذاكرة الهاتف 📱", fontSize = 10.sp)
+                            }
+
+                            if (selectedBase64 != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                TextButton(
+                                    onClick = {
+                                        selectedBase64 = null
+                                        FirestoreSim.updateWelcomeBanner(welcomeText, welcomeFontSize, welcomePos, null, showBanner)
+                                    },
+                                    modifier = Modifier.weight(0.7f)
+                                ) {
+                                    Text("حذف الصورة والرجوع للنص", color = YemenRedAccent, fontSize = 9.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2531,6 +2789,10 @@ fun SupervisorsManagerSection(
     var editingSupId by remember { mutableStateOf<String?>(null) }
     var editName by remember { mutableStateOf("") }
     var editPinCode by remember { mutableStateOf("") }
+    var editCanEditCats by remember { mutableStateOf(false) }
+    var editCanDelProvs by remember { mutableStateOf(false) }
+    var editCanBackup by remember { mutableStateOf(false) }
+    var editCanModifyConfs by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -2598,10 +2860,10 @@ fun SupervisorsManagerSection(
                                             sup.id,
                                             editName,
                                             editPinCode,
-                                            sup.canEditCategories,
-                                            sup.canDeleteProviders,
-                                            sup.canViewBackup,
-                                            sup.canModifyConfigs
+                                            editCanEditCats,
+                                            editCanDelProvs,
+                                            editCanBackup,
+                                            editCanModifyConfs
                                         )
                                         editingSupId = null
                                     }
@@ -2615,6 +2877,10 @@ fun SupervisorsManagerSection(
                                 IconButton(onClick = {
                                     editName = sup.name
                                     editPinCode = sup.pinCode
+                                    editCanEditCats = sup.canEditCategories
+                                    editCanDelProvs = sup.canDeleteProviders
+                                    editCanBackup = sup.canViewBackup
+                                    editCanModifyConfs = sup.canModifyConfigs
                                     editingSupId = sup.id
                                 }) {
                                     Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color.White)
@@ -2629,52 +2895,88 @@ fun SupervisorsManagerSection(
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("الصلاحيات النشطة الممنوحة للحساب:", color = SoftGrayText, fontSize = 11.sp)
+                    Text(
+                        text = if (isEditing) "تحديد وتعديل الصلاحيات الممنوحة:" else "الصلاحيات النشطة الممنوحة للحساب:",
+                        color = SoftGrayText,
+                        fontSize = 11.sp
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (sup.canEditCategories) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                                    contentDescription = "status",
-                                    tint = if (sup.canEditCategories) MutedGreen else YemenRedAccent,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                if (isEditing) {
+                                    Checkbox(
+                                        checked = editCanEditCats,
+                                        onCheckedChange = { editCanEditCats = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = MutedGreen)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (sup.canEditCategories) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                        contentDescription = "status",
+                                        tint = if (sup.canEditCategories) MutedGreen else YemenRedAccent,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
                                 Text("تعديل الأقسام وتصنيفاتها", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (sup.canDeleteProviders) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                                    contentDescription = "status",
-                                    tint = if (sup.canDeleteProviders) MutedGreen else YemenRedAccent,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("تعديل اشتراكات وحذف مقدمي الخدمات", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
+                                if (isEditing) {
+                                    Checkbox(
+                                        checked = editCanDelProvs,
+                                        onCheckedChange = { editCanDelProvs = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = MutedGreen)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (sup.canDeleteProviders) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                        contentDescription = "status",
+                                        tint = if (sup.canDeleteProviders) MutedGreen else YemenRedAccent,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Text("الاشتراكات وحذف مقدمي الخدمات", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
                             }
                         }
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (sup.canViewBackup) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                                    contentDescription = "status",
-                                    tint = if (sup.canViewBackup) MutedGreen else YemenRedAccent,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                if (isEditing) {
+                                    Checkbox(
+                                        checked = editCanBackup,
+                                        onCheckedChange = { editCanBackup = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = MutedGreen)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (sup.canViewBackup) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                        contentDescription = "status",
+                                        tint = if (sup.canViewBackup) MutedGreen else YemenRedAccent,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
                                 Text("قراءة واسترجاع النسخ التخزينية", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (sup.canModifyConfigs) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                                    contentDescription = "status",
-                                    tint = if (sup.canModifyConfigs) MutedGreen else YemenRedAccent,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                if (isEditing) {
+                                    Checkbox(
+                                        checked = editCanModifyConfs,
+                                        onCheckedChange = { editCanModifyConfs = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = MutedGreen)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (sup.canModifyConfigs) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                        contentDescription = "status",
+                                        tint = if (sup.canModifyConfigs) MutedGreen else YemenRedAccent,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
                                 Text("التحكم في المساعد والمظاهر", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
                             }
                         }

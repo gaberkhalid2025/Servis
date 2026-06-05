@@ -83,6 +83,13 @@ data class AppConfigs(
     // Google Maps integration status
     var googleMapsEnabled: Boolean = true,
     
+    // Welcome message configurations
+    var welcomeText: String = "أهلاً بك في الدليل الرسمي للخدمات والصيانة في اليمن 🇾🇪",
+    var welcomeTextSize: Float = 16f, // in sp
+    var welcomePosition: String = "top", // "top", "below_search", "below_map"
+    var welcomeImageBase64: String? = null, // Custom image from phone memory instead of text
+    var showWelcomeBanner: Boolean = true,
+
     // Default search ranges
     var defaultSearchRangeKm: Int = 10,
     var isMaintenanceMode: Boolean = false

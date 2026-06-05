@@ -133,7 +133,7 @@ object FirestoreSim {
 
         // Prepopulate Supervisors
         val sups = listOf(
-            Supervisor("sup1", "الأدمن العام", "1111", canEditCategories = true, canDeleteProviders = true, canViewBackup = true, canModifyConfigs = true),
+            Supervisor("sup1", "الأدمن العام", "maher--736462", canEditCategories = true, canDeleteProviders = true, canViewBackup = true, canModifyConfigs = true),
             Supervisor("sup2", "المشرف عادل", "2222", canEditCategories = true, canDeleteProviders = false, canViewBackup = false, canModifyConfigs = false)
         )
         _supervisors.value = sups
@@ -303,6 +303,20 @@ object FirestoreSim {
             aboutAppHidden = hidden,
             aboutAppIconBase64 = customBase64 ?: _configs.value.aboutAppIconBase64
         )
+    }
+
+    fun updateWelcomeBanner(text: String, size: Float, position: String, imageBase64: String?, show: Boolean) {
+        _configs.value = _configs.value.copy(
+            welcomeText = text,
+            welcomeTextSize = size,
+            welcomePosition = position,
+            welcomeImageBase64 = imageBase64,
+            showWelcomeBanner = show
+        )
+    }
+
+    fun triggerDataSync() {
+        _configs.value = _configs.value.copy()
     }
 
     // -------------------------------------------------------------
